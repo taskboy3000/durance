@@ -1,3 +1,4 @@
+# All code copyright Joe Johnston <jjohn@taskboy.com> 2026
 package ORM::Schema;
 use strict;
 use warnings;
@@ -6,6 +7,31 @@ use Carp qw(croak);
 
 has 'dbh';
 has 'model_class';
+has 'driver';
+
+my %TYPE_MAP = (
+    sqlite => {
+        Int       => 'INTEGER',
+        Str       => 'TEXT',
+        Text      => 'TEXT',
+        Bool      => 'INTEGER',
+        Float     => 'REAL',
+        Timestamp => 'TEXT',
+    },
+    mysql => {
+        Int       => 'INTEGER',
+        Str       => 'VARCHAR',
+        Text      => 'TEXT',
+        Bool      => 'TINYINT(1)',
+        Float     => 'DOUBLE',
+        Timestamp => 'TIMESTAMP',
+    },
+);
+
+my %AUTO_INCREMENT = (
+    sqlite => 'AUTOINCREMENT',
+    mysql  => 'AUTO_INCREMENT',
+);
 
 sub _db_class_for ($class) {
     my $pkg = $class =~ /::$/ ? $class : $class;
@@ -19,139 +45,130 @@ sub _db_class_for ($class) {
 
 sub _get_dbh_for {
     my ($self, $model_class) = @_;
-    
+
     return $self->dbh if $self->dbh;
-    
+
     my $db_class = $self->model_class // _db_class_for($model_class);
-    
+
     my $loaded;
     {
         no strict 'refs';
         $loaded = %{"${db_class}::"} > 0 || @{"${db_class}::ISA"} > 0;
     }
-    
+
     if (!$loaded) {
         eval "require $db_class";
         croak "Cannot load DB class $db_class: $@" if $@;
     }
-    
+
     if ($db_class->can('dbh')) {
         return $db_class->dbh;
     }
-    
-    croak "No database handle available. Set dbh on schema or ensure $db_class can provide one.";
+
+    croak "No database handle available. "
+        . "Set dbh on schema or ensure $db_class can provide one.";
 }
 
-=head1 NAME
+sub _detect_driver ( $self, $dbh = undef ) {
+    return $self->driver if $self->driver;
 
-ORM::Schema - Schema manager for ORM models
+    $dbh //= $self->dbh;
+    return 'sqlite' unless $dbh;
 
-=head1 SYNOPSIS
+    my $driver = eval { $dbh->{Driver}{Name} } // '';
+    return 'sqlite' if $driver eq 'SQLite';
+    return 'mysql'  if $driver eq 'mysql';
+    return 'sqlite';
+}
 
-    use ORM::Schema;
-    use MyApp::Model::User;
-    
-    my $schema = ORM::Schema->new(dbh => $dbh);
-    $schema->create_table(MyApp::Model::User->new);
-    
-    # Or use class directly
-    $schema->create_table_for_class('MyApp::Model::User');
+sub _type_for ( $self, $driver, $isa, $meta = {} ) {
+    my $map = $TYPE_MAP{$driver} // $TYPE_MAP{sqlite};
+    my $sql_type = $map->{$isa} // $map->{Str};
 
-=head1 DESCRIPTION
-
-ORM::Schema manages database tables based on ORM model definitions.
-It can create tables, add columns, and modify schema to match model definitions.
-
-=head1 ATTRIBUTES
-
-=over 4
-
-=item * dbh - Database handle (required)
-
-=back
-
-=head1 METHODS
-
-=head2 new(%attributes)
-
-Create a new ORM::Schema instance.
-
-    my $schema = ORM::Schema->new(dbh => $dbh);
-
-=head2 $schema->create_table_for_class($class_name)
-
-Create a table for the given model class.
-
-    $schema->create_table_for_class('MyApp::Model::User');
-
-=head2 $schema->create_table($model_instance)
-
-Create a table based on a model instance.
-
-    $schema->create_table($user);
-
-=head2 $schema->table_exists($table_name)
-
-Check if a table exists.
-
-    if ($schema->table_exists('users')) {
-        # table exists
+    if ($isa eq 'Str' && $driver eq 'mysql') {
+        my $len = $meta->{length} // 255;
+        $sql_type = "VARCHAR($len)";
     }
 
-=head2 $schema->column_info($table, $column)
+    return $sql_type;
+}
 
-Get information about a column.
+sub _column_sql ( $self, $name, $type, $meta, $driver = undef ) {
+    $driver //= $self->_detect_driver;
+    my $sql = "$name ";
 
-    my $info = $schema->column_info('users', 'name');
+    $sql .= $self->_type_for($driver, $type, $meta);
 
-=head2 $schema->table_info($table)
+    if ( $meta->{required}
+        || (defined $meta->{nullable} && $meta->{nullable} eq '0') )
+    {
+        $sql .= ' NOT NULL';
+    }
 
-Get all columns for a table.
+    if ( defined $meta->{default} ) {
+        my $default = $meta->{default};
+        if ($default =~ /\D/) {
+            $default = "'$default'";
+        }
+        $sql .= " DEFAULT $default";
+    }
 
-    my @columns = $schema->table_info('users');
+    if ( $meta->{unique} ) {
+        $sql .= ' UNIQUE';
+    }
 
-=head2 $schema->migrate($model_class)
+    return $sql;
+}
 
-Migrate table to match model definition (add missing columns).
+sub _pk_sql ( $self, $pk, $driver = undef ) {
+    $driver //= $self->_detect_driver;
+    my $auto = $AUTO_INCREMENT{$driver} // $AUTO_INCREMENT{sqlite};
+    return "$pk INTEGER PRIMARY KEY $auto";
+}
 
-    $schema->migrate('MyApp::Model::User');
+sub _build_columns_def ( $self, $class, $driver = undef ) {
+    $driver //= $self->_detect_driver;
+    my @defs;
 
-=head2 $schema->sync_table($model_class)
+    my $attrs = $class->attributes;
+    my $pk    = $class->primary_key;
 
-Sync table schema (create if not exists, migrate if needed).
+    for my $attr (@$attrs) {
+        next if $attr eq $pk;
+        next if $attr eq 'dbh';
 
-    $schema->sync_table('MyApp::Model::User');
+        my $meta = $class->column_meta($attr) // {};
+        my $type = $meta->{isa} // 'Str';
 
-=head2 $schema->pending_changes($model_class)
+        my $col_def = $self->_column_sql( $attr, $type, $meta, $driver );
+        push @defs, $col_def if $col_def;
+    }
 
-Check for pending schema changes.
+    return join ', ', @defs;
+}
 
-    my @pending = @{$schema->pending_changes('MyApp::Model::User')};
+sub _build_create_table_sql ( $self, $class, $driver = undef ) {
+    $driver //= $self->_detect_driver;
 
-=head2 $schema->schema_version
+    my $table       = $class->table;
+    my $pk          = $class->primary_key;
+    my $columns_def = $self->_build_columns_def($class, $driver);
 
-Get the current schema version.
+    my $sql = "CREATE TABLE $table (";
+    $sql .= $self->_pk_sql($pk, $driver);
+    $sql .= ", $columns_def" if $columns_def;
+    $sql .= ")";
 
-    my $version = $schema->schema_version;
+    return $sql;
+}
 
-=head1 AUTOMATIC DBH DERIVATION
-
-ORM::Schema can automatically derive the database handle from the model class.
-Given a model like C<MyApp::Model::User>, it will look for C<MyApp::DB> and
-call C<< MyApp::DB->dbh >> to get the connection.
-
-    # These are equivalent:
-    my $schema = ORM::Schema->new(dbh => $dbh);
-    my $schema = ORM::Schema->new(model_class => 'MyApp::Model::User');
-    my $schema = ORM::Schema->new();  # Derives from context
-
-=cut
+sub ddl_for_class ( $self, $class_name, $driver = undef ) {
+    $driver //= $self->_detect_driver;
+    return $self->_build_create_table_sql($class_name, $driver);
+}
 
 sub create_table_for_class ( $self, $class_name ) {
-    my $table   = $class_name->can('table') ? $class_name->table : $class_name;
-    my $columns = $class_name->can('columns') ? $class_name->columns : [];
-    my $dbh     = $self->_get_dbh_for($class_name);
-
+    my $dbh = $self->_get_dbh_for($class_name);
     return $self->create_table( $class_name->new( dbh => $dbh ) );
 }
 
@@ -164,77 +181,12 @@ sub create_table ( $self, $model ) {
         return $self->migrate($model);
     }
 
-    my $columns_def = $self->_build_columns_def($class);
-    my $pk          = $class->primary_key;
-
-    my $sql = "CREATE TABLE $table (";
-    if ($pk eq 'id') {
-        $sql .= "$pk INTEGER PRIMARY KEY AUTOINCREMENT";
-        $sql .= ", $columns_def" if $columns_def;
-    }
-    else {
-        $sql .= $columns_def;
-    }
-    $sql .= ")";
+    my $driver = $self->_detect_driver($dbh);
+    my $sql    = $self->_build_create_table_sql($class, $driver);
 
     $dbh->do($sql);
 
     return 1;
-}
-
-sub _build_columns_def ( $self, $class ) {
-    my @defs;
-
-    my $attrs = $class->attributes;
-    my $pk    = $class->primary_key;
-
-    for my $attr (@$attrs) {
-        next if $attr eq $pk;
-        next if $attr eq 'dbh';
-
-        my $meta = $class->$attr // {};
-        my $type = $meta->{isa}  // 'Str';
-
-        my $col_def = $self->_column_sql( $attr, $type, $meta );
-        push @defs, $col_def if $col_def;
-    }
-
-    return join ', ', @defs;
-}
-
-sub _column_sql ( $self, $name, $type, $meta ) {
-    my $sql = "$name ";
-
-    $type = lc $type;
-
-    if ( $type =~ /int/i ) {
-        $sql .= 'INTEGER';
-    }
-    elsif ( $type =~ /num|real|float|double/i ) {
-        $sql .= 'REAL';
-    }
-    elsif ( $type =~ /bool/i ) {
-        $sql .= 'INTEGER';
-    }
-    else {
-        $sql .= 'TEXT';
-    }
-
-    if ( $meta->{required} || (defined $meta->{nullable} && $meta->{nullable} eq '0') ) {
-        $sql .= ' NOT NULL';
-    }
-
-    if ( $meta->{default} ) {
-        my $default = $meta->{default};
-        $default = "'$default'" if $default =~ /\D/;
-        $sql .= " DEFAULT $default";
-    }
-
-    if ( $meta->{unique} ) {
-        $sql .= ' UNIQUE';
-    }
-
-    return $sql;
 }
 
 sub table_exists ( $self, $table ) {
@@ -279,6 +231,8 @@ sub migrate ( $self, $model ) {
     my $table = $class->table;
     my $dbh   = $self->dbh // $model->dbh // croak 'No database handle';
 
+    my $driver = $self->_detect_driver($dbh);
+
     my %existing;
     for my $col ( $self->table_info($table) ) {
         $existing{ $col->{COLUMN_NAME} } = 1;
@@ -292,10 +246,11 @@ sub migrate ( $self, $model ) {
         next if $attr eq 'dbh';
         next if $existing{$attr};
 
-        my $meta = $class->$attr // {};
-        my $type = $meta->{isa}  // 'Str';
+        my $meta = $class->column_meta($attr) // {};
+        my $type = $meta->{isa} // 'Str';
 
-        if ( my $col_def = $self->_column_sql( $attr, $type, $meta ) ) {
+        if ( my $col_def = $self->_column_sql($attr, $type, $meta, $driver) )
+        {
             my $sql = "ALTER TABLE $table ADD COLUMN $col_def";
             $dbh->do($sql);
         }
@@ -318,7 +273,7 @@ sub sync_table ( $self, $class_or_model ) {
     }
 
     my @changes = @{$self->pending_changes($class)};
-    
+
     if (@changes) {
         $self->migrate($model);
         $self->_record_version($dbh, "Migrated: $class->table");
@@ -356,7 +311,44 @@ sub pending_changes ( $self, $class ) {
         }
     }
 
+    if (_has_sqlt() && %existing) {
+        my @sqlt_changes = $self->_sqlt_pending_changes(
+            $class_name, \%existing
+        );
+        push @pending, @sqlt_changes;
+    }
+
     return \@pending;
+}
+
+sub _has_sqlt {
+    return eval { require SQL::Translator; 1 };
+}
+
+sub _sqlt_pending_changes ( $self, $class_name, $existing ) {
+    my @changes;
+
+    my $attrs  = $class_name->columns;
+    my $pk     = $class_name->primary_key;
+    my $driver = $self->_detect_driver;
+
+    for my $attr (@$attrs) {
+        next if $attr eq $pk;
+        next if $attr eq 'dbh';
+        next unless exists $existing->{$attr};
+
+        my $meta     = $class_name->column_meta($attr) // {};
+        my $isa      = $meta->{isa} // 'Str';
+        my $expected = $self->_type_for($driver, $isa, $meta);
+
+        my $actual = $existing->{$attr}{TYPE_NAME} // '';
+        if ( uc($expected) ne uc($actual) ) {
+            push @changes,
+                "TYPE MISMATCH $attr: expected $expected, got $actual";
+        }
+    }
+
+    return @changes;
 }
 
 sub _ensure_schema_info_table ( $self, $dbh ) {
@@ -368,9 +360,11 @@ sub _ensure_schema_info_table ( $self, $dbh ) {
     };
 
     unless ($table_exists) {
-        $dbh->do(<<SQL);
+        my $driver = $self->_detect_driver($dbh);
+        my $auto   = $AUTO_INCREMENT{$driver} // $AUTO_INCREMENT{sqlite};
+        $dbh->do(<<"SQL");
 CREATE TABLE schema_info (
-    version   INTEGER PRIMARY KEY AUTOINCREMENT,
+    version    INTEGER PRIMARY KEY $auto,
     applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     change_desc TEXT
 )
@@ -379,7 +373,10 @@ SQL
 }
 
 sub _record_version ( $self, $dbh, $change_desc ) {
-    $dbh->do("INSERT INTO schema_info (change_desc) VALUES (?)", undef, $change_desc);
+    $dbh->do(
+        "INSERT INTO schema_info (change_desc) VALUES (?)",
+        undef, $change_desc
+    );
 }
 
 sub schema_version ($self) {
@@ -396,12 +393,143 @@ sub schema_version ($self) {
 
 1;
 
-=head1 AUTHOR
+__END__
 
-ORM Framework
+=head1 NAME
 
-=head1 LICENSE
+ORM::Schema - Schema manager for ORM models
 
-MIT
+=head1 SYNOPSIS
+
+    use ORM::Schema;
+    use MyApp::Model::User;
+
+    my $schema = ORM::Schema->new(dbh => $dbh);
+    $schema->create_table_for_class('MyApp::Model::User');
+
+    # Inspect DDL without executing
+    my $sql = $schema->ddl_for_class('MyApp::Model::User');
+    my $mysql_sql = $schema->ddl_for_class('MyApp::Model::User', 'mysql');
+
+=head1 DESCRIPTION
+
+ORM::Schema manages database tables based on ORM model definitions.
+It supports multiple database systems (SQLite and MySQL/MariaDB) by
+generating dialect-specific DDL from model column definitions.
+
+=head1 ATTRIBUTES
+
+=over 4
+
+=item * dbh - Database handle (optional if model_class is set)
+
+=item * model_class - Model class name for auto-deriving dbh
+
+=item * driver - Override database driver detection ('sqlite' or 'mysql')
+
+=back
+
+=head1 METHODS
+
+=head2 ddl_for_class
+
+    my $sql = $schema->ddl_for_class('MyApp::Model::User');
+    my $sql = $schema->ddl_for_class('MyApp::Model::User', 'mysql');
+
+Returns the CREATE TABLE DDL for a model class without executing it.
+Optionally pass a driver name to generate DDL for a specific database.
+
+=head2 create_table_for_class
+
+    $schema->create_table_for_class('MyApp::Model::User');
+
+Creates a table for the given model class. If the table already exists,
+runs migrate instead.
+
+=head2 create_table
+
+    $schema->create_table(MyApp::Model::User->new);
+
+Creates a table from a model instance.
+
+=head2 table_exists
+
+    if ($schema->table_exists('users')) { ... }
+
+Returns true if the table exists in the database.
+
+=head2 column_info
+
+    my $info = $schema->column_info('users', 'email');
+
+Returns column metadata from the database.
+
+=head2 table_info
+
+    my @columns = $schema->table_info('users');
+
+Returns all column metadata for a table.
+
+=head2 migrate
+
+    $schema->migrate(MyApp::Model::User->new);
+
+Adds missing columns to an existing table.
+
+=head2 sync_table
+
+    my $changes = $schema->sync_table('MyApp::Model::User');
+
+Creates or migrates a table to match the model definition.
+
+=head2 pending_changes
+
+    my @pending = @{$schema->pending_changes('MyApp::Model::User')};
+
+Returns a list of pending schema changes. If SQL::Translator is
+available, also reports type mismatches.
+
+=head2 schema_version
+
+    my $version = $schema->schema_version;
+
+Returns the current schema version number.
+
+=head1 MULTI-DATABASE SUPPORT
+
+ORM::Schema detects the database driver from the DBI handle and
+generates appropriate DDL. You can also override the driver explicitly:
+
+    my $schema = ORM::Schema->new(dbh => $dbh, driver => 'mysql');
+
+Supported drivers:
+
+=over 4
+
+=item * sqlite - SQLite (default)
+
+=item * mysql - MySQL / MariaDB
+
+=back
+
+=head2 Type Mapping
+
+    | ORM Type  | SQLite  | MySQL        |
+    |-----------|---------|--------------|
+    | Int       | INTEGER | INTEGER      |
+    | Str       | TEXT    | VARCHAR(n)   |
+    | Text      | TEXT    | TEXT         |
+    | Bool      | INTEGER | TINYINT(1)   |
+    | Float     | REAL    | DOUBLE       |
+    | Timestamp | TEXT    | TIMESTAMP    |
+
+For Str columns on MySQL, the length defaults to 255 and can be set
+via the C<length> option in the column definition.
+
+=head1 OPTIONAL SQL::TRANSLATOR SUPPORT
+
+If L<SQL::Translator> is installed, C<pending_changes> will also detect
+type mismatches between the model definition and the database. Without
+SQL::Translator, only missing columns are reported.
 
 =cut

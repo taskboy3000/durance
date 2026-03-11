@@ -6,3 +6,4 @@ requires 'DBD::SQLite';
 requires 'Test2::Suite';
 requires 'Modern::Perl';
 requires 'Perl::Tidy';
+requires 'SQL::Translator';

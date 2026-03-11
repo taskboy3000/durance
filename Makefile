@@ -31,6 +31,12 @@ setup: deps
 lint:
 	perl -Ilib -c $$($$(find lib -name '*.pm')) 2>&1 | grep -v "syntax OK" || true
 
+tidy:
+	perltidy -b $$(find lib t -name '*.pm' -type f)
+
+tidy-dry:
+	perltidy -st -se $$(find lib t -name '*.pm' -type f)
+
 clean:
 	rm -rf doc/ *.bak my.db
 

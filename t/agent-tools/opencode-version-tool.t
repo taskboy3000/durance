@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+# All code copyright Joe Johnston <jjohn@taskboy.com> 2026
 use strict;
 use warnings;
 

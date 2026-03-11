@@ -1,3 +1,4 @@
+# All code copyright Joe Johnston <jjohn@taskboy.com> 2026
 package MyApp::Model::admin::permission;
 use base ORM::Model;
 

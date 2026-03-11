@@ -160,3 +160,9 @@ sub table { 'entities' }
 - Create temporary databases with File::Temp
 - Test success and failure cases
 - Clean up resources (disconnect dbh)
+
+## Documentation Guidelines
+
+### Markdown Files
+- Wrap all lines at 100 characters maximum
+- This applies to intention, plan, and README files

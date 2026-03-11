@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+# All code copyright Joe Johnston <jjohn@taskboy.com> 2026
 use strict;
 use warnings;
 use lib ('lib', 't', ($ENV{PERL5LIB} || '.'));
@@ -275,6 +276,138 @@ subtest 'ORM::Model - global dbh' => sub {
 
 subtest 'ORM::Model - error handling' => sub {
     skip_all 'Error handling tests need review for new auto-connect behavior';
+};
+
+subtest 'ORM::Schema - DDL generation for SQLite' => sub {
+    my $schema = ORM::Schema->new(driver => 'sqlite');
+
+    my $sql = $schema->ddl_for_class('MyApp::Model::User', 'sqlite');
+    like($sql, qr/CREATE TABLE users/,       'contains CREATE TABLE');
+    like($sql, qr/id INTEGER PRIMARY KEY AUTOINCREMENT/,
+        'SQLite auto-increment syntax');
+    like($sql, qr/name TEXT NOT NULL/,        'name is TEXT NOT NULL');
+    like($sql, qr/email TEXT/,                'email is TEXT');
+    like($sql, qr/age INTEGER/,              'age is INTEGER');
+    like($sql, qr/active INTEGER/,           'active is INTEGER');
+    unlike($sql, qr/VARCHAR/,               'no VARCHAR for SQLite');
+};
+
+subtest 'ORM::Schema - DDL generation for MySQL' => sub {
+    my $schema = ORM::Schema->new(driver => 'mysql');
+
+    my $sql = $schema->ddl_for_class('MyApp::Model::User', 'mysql');
+    like($sql, qr/CREATE TABLE users/,       'contains CREATE TABLE');
+    like($sql, qr/id INTEGER PRIMARY KEY AUTO_INCREMENT/,
+        'MySQL auto-increment syntax');
+    like($sql, qr/name VARCHAR\(255\) NOT NULL/, 'name is VARCHAR(255)');
+    like($sql, qr/email VARCHAR\(255\)/,     'email is VARCHAR(255)');
+    like($sql, qr/age INTEGER/,              'age is INTEGER');
+    like($sql, qr/active INTEGER/,           'active is INTEGER with default');
+    unlike($sql, qr/AUTOINCREMENT/,          'no SQLite AUTOINCREMENT');
+};
+
+subtest 'ORM::Schema - DDL with length and types' => sub {
+    package MyApp::Model::Article;
+    use Mojo::Base 'ORM::Model', '-signatures';
+    use ORM::Model;
+
+    column id          => (is => 'rw', isa => 'Int', primary_key => 1);
+    column title       => (is => 'rw', isa => 'Str', length => 100, required => 1);
+    column body        => (is => 'rw', isa => 'Text');
+    column published   => (is => 'rw', isa => 'Bool', default => 0);
+    column rating      => (is => 'rw', isa => 'Float');
+    column created_at  => (is => 'rw', isa => 'Timestamp');
+
+    sub table { 'articles' }
+
+    package main;
+
+    my $schema = ORM::Schema->new(driver => 'mysql');
+    my $sql = $schema->ddl_for_class('MyApp::Model::Article', 'mysql');
+
+    like($sql, qr/title VARCHAR\(100\) NOT NULL/, 'length option respected');
+    like($sql, qr/body TEXT/,                      'Text maps to TEXT');
+    like($sql, qr/published TINYINT\(1\)/,         'Bool maps to TINYINT(1)');
+    like($sql, qr/rating DOUBLE/,                  'Float maps to DOUBLE');
+    like($sql, qr/created_at TIMESTAMP/,           'Timestamp maps to TIMESTAMP');
+
+    my $sqlite_sql = $schema->ddl_for_class('MyApp::Model::Article', 'sqlite');
+    like($sqlite_sql, qr/title TEXT NOT NULL/,     'SQLite: Str is TEXT');
+    like($sqlite_sql, qr/body TEXT/,               'SQLite: Text is TEXT');
+    like($sqlite_sql, qr/published INTEGER/,       'SQLite: Bool is INTEGER');
+    like($sqlite_sql, qr/rating REAL/,             'SQLite: Float is REAL');
+    like($sqlite_sql, qr/created_at TEXT/,         'SQLite: Timestamp is TEXT');
+};
+
+subtest 'ORM::Model - string length validation' => sub {
+    package MyApp::Model::ShortName;
+    use Mojo::Base 'ORM::Model', '-signatures';
+    use ORM::Model;
+
+    column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+    column code => (is => 'rw', isa => 'Str', length => 5);
+
+    sub table { 'short_names' }
+
+    package main;
+
+    my $obj = MyApp::Model::ShortName->new;
+    $obj->code('ABCDE');
+    is($obj->code, 'ABCDE', 'value within length accepted');
+
+    my $died = dies { $obj->code('ABCDEF') };
+    like($died, qr/exceeds maximum length of 5/, 'value exceeding length rejected');
+};
+
+subtest 'ORM::Model - Bool coercion' => sub {
+    package MyApp::Model::Flags;
+    use Mojo::Base 'ORM::Model', '-signatures';
+    use ORM::Model;
+
+    column id      => (is => 'rw', isa => 'Int', primary_key => 1);
+    column enabled => (is => 'rw', isa => 'Bool', default => 1);
+    column hidden  => (is => 'rw', isa => 'Bool', default => 0);
+
+    sub table { 'flags' }
+
+    package main;
+
+    my $obj = MyApp::Model::Flags->new;
+
+    $obj->enabled('yes');
+    is($obj->enabled, 1, 'truthy string coerced to 1');
+
+    $obj->enabled(0);
+    is($obj->enabled, 0, 'zero stays 0');
+
+    $obj->enabled('');
+    is($obj->enabled, 0, 'empty string coerced to 0');
+
+    $obj->enabled(42);
+    is($obj->enabled, 1, 'nonzero int coerced to 1');
+
+    $obj->hidden(undef);
+    is($obj->hidden, 0, 'undef not set, default returned');
+
+    my $fresh = MyApp::Model::Flags->new;
+    is($fresh->enabled, 1, 'Bool default 1 returned');
+    is($fresh->hidden, 0, 'Bool default 0 returned');
+};
+
+subtest 'ORM::Schema - create table uses correct SQLite DDL' => sub {
+    my $dbh = create_test_db();
+    my $schema = ORM::Schema->new(dbh => $dbh);
+
+    $schema->create_table_for_class('MyApp::Model::User');
+    ok($schema->table_exists('users'), 'table created with auto-detected driver');
+
+    my @cols = $schema->table_info('users');
+    my %col_names = map { $_->{COLUMN_NAME} => 1 } @cols;
+    ok($col_names{id},     'id column exists');
+    ok($col_names{name},   'name column exists');
+    ok($col_names{email},  'email column exists');
+
+    $dbh->disconnect;
 };
 
 done_testing;

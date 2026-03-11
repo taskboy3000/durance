@@ -214,29 +214,56 @@ based on validation rules defined in the model:
 
 ```perl
 # User writes only this:
-column email => (is => 'rw', isa => 'Str', required => 1);
+column email => (is => 'rw', isa => 'Str', required => 1, length => 255);
 validates email => (format => qr/@/);
 
-# ORM automatically generates setter with validation
-sub email ($self, $value = undef) {
-    if (defined $value) {
-        unless ($value =~ /@/) {
-            croak "Invalid email: $value";
-        }
-    }
-    return $self->{email} = $value if defined $value;
-    return $self->{email};
-}
+# ORM automatically generates setter with validation:
+# - format validation (via validates)
+# - length enforcement (via column length option)
+# - Bool coercion (truthy values become 1, falsy become 0)
 ```
+
+**Length enforcement:** When a column has a `length` option, the ORM validates
+that assigned values do not exceed the specified length. This applies regardless
+of database type, so SQLite users get the same protection as MySQL users.
+
+**Bool coercion:** Columns with `isa => 'Bool'` automatically coerce values
+using Perl truthiness: truthy values become 1, falsy values become 0.
 
 ### Supported Column Types
 
-- `isa => 'Int'` — INTEGER
-- `isa => 'Str'` — VARCHAR (default length: 255)
-- `isa => 'Text'` — TEXT (unlimited length)
-- `isa => 'Timestamp'` — TIMESTAMP
-- `isa => 'Bool'` — BOOLEAN
-- `isa => 'Float'` — REAL
+| ORM Type  | SQLite  | MySQL        | Setter Behavior |
+|-----------|---------|--------------|-----------------|
+| Int       | INTEGER | INTEGER      | No coercion     |
+| Str       | TEXT    | VARCHAR(n)   | Length enforced  |
+| Text      | TEXT    | TEXT         | No length limit  |
+| Bool      | INTEGER | TINYINT(1)   | Coerced to 0/1  |
+| Float     | REAL    | DOUBLE       | No coercion     |
+| Timestamp | TEXT    | TIMESTAMP    | No coercion     |
+
+For Str columns on MySQL, the length defaults to 255. Set `length => n` to
+override.
+
+### Multi-RDBMS Support
+
+The ORM supports SQLite and MySQL/MariaDB. The database driver is detected
+automatically from the DBI handle. DDL generation adapts to the target
+database.
+
+**Inspecting generated DDL:**
+
+```perl
+my $schema = ORM::Schema->new(driver => 'mysql');
+my $sql = $schema->ddl_for_class('MyApp::Model::User');
+# Returns: CREATE TABLE users (id INTEGER PRIMARY KEY AUTO_INCREMENT, ...)
+
+my $sqlite_sql = $schema->ddl_for_class('MyApp::Model::User', 'sqlite');
+# Returns: CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, ...)
+```
+
+**Optional SQL::Translator support:** If SQL::Translator is installed, the
+`pending_changes` method will also report type mismatches between model
+definitions and the database. Without it, only missing columns are detected.
 
 ### Database Naming Conventions
 

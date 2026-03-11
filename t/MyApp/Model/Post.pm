@@ -1,3 +1,4 @@
+# All code copyright Joe Johnston <jjohn@taskboy.com> 2026
 package MyApp::Model::Post;
 use Mojo::Base 'ORM::Model', '-signatures';
 use ORM::Model;

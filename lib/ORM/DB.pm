@@ -1,3 +1,4 @@
+# All code copyright Joe Johnston <jjohn@taskboy.com> 2026
 package ORM::DB;
 use strict;
 use warnings;
@@ -30,21 +31,6 @@ sub dbh ($self) {
 
     $HANDLES{$key} = $dbh;
     return $dbh;
-}
-
-sub _build_dsn ($class, $type, $dbname, $host = undef) {
-    if ($type eq 'sqlite') {
-        return "dbi:SQLite:dbname=$dbname";
-    }
-    elsif ($type eq 'mariadb' || $type eq 'mysql') {
-        $host //= 'localhost';
-        return "dbi:mysql:host=$host;database=$dbname";
-    }
-    elsif ($type eq 'postgres') {
-        $host //= 'localhost';
-        return "dbi:Pg:host=$host;dbname=$dbname";
-    }
-    croak "Unsupported database type: $type";
 }
 
 sub disconnect_all {

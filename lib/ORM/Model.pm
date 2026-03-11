@@ -1,3 +1,4 @@
+# All code copyright Joe Johnston <jjohn@taskboy.com> 2026
 package ORM::Model;
 use strict;
 use warnings;
@@ -69,12 +70,17 @@ sub import {
 
         my $is = $opts{is} // 'rw';
         my $validations = $ORM::Model::_validations{$pkg}{$name} // {};
+        my $col_isa     = lc($opts{isa} // '');
+        my $col_length  = $opts{length};
+        my $is_bool     = ($col_isa eq 'bool') ? 1 : 0;
 
         if ( $is eq 'rw' ) {
             *{"${pkg}::${name}"} = sub {
                 my ( $self, $val ) = @_;
                 if ( defined $val ) {
-                    if (exists $validations->{required} && $validations->{required} && !defined $val) {
+                    if (exists $validations->{required}
+                        && $validations->{required} && !defined $val)
+                    {
                         croak "$name is required";
                     }
                     if (exists $validations->{format} && defined $val) {
@@ -82,8 +88,19 @@ sub import {
                             croak "Invalid $name: $val";
                         }
                     }
+                    if ($is_bool) {
+                        $val = $val ? 1 : 0;
+                    }
+                    if (defined $col_length && length($val) > $col_length) {
+                        croak "$name exceeds maximum length of $col_length";
+                    }
                     $self->{$name} = $val;
                     return $self;
+                }
+                if ($is_bool && !exists $self->{$name}
+                    && defined $opts{default})
+                {
+                    return $opts{default} ? 1 : 0;
                 }
                 return $self->{$name};
             };
@@ -522,6 +539,25 @@ Defines a column for the model. Options:
 =item * unique - Set to 1 for unique constraint
 
 =item * default - Default value
+
+=item * length - Maximum string length (enforced in setter, used for VARCHAR on MySQL)
+
+=back
+
+=head3 Setter Behavior
+
+Setters generated for columns include automatic validation and coercion:
+
+=over 4
+
+=item * B<Length enforcement>: If C<length> is set, assigning a value longer
+than the limit will croak. This applies regardless of database type.
+
+=item * B<Bool coercion>: Columns with C<isa =E<gt> 'Bool'> automatically
+coerce values using Perl truthiness: truthy values become 1, falsy become 0.
+
+=item * B<Format validation>: If a C<validates> rule with C<format> is
+defined, the value is checked against the regex on set.
 
 =back
 
