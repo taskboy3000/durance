@@ -325,27 +325,7 @@ sub _has_sqlt {
     return eval { require SQL::Translator; 1 };
 }
 
-sub _sqlt_pending_changes ( $self, $class_name, $existing ) {
-    my @changes;
 
-    my $attrs  = $class_name->columns;
-    my $pk     = $class_name->primary_key;
-    my $driver = $self->_detect_driver;
-
-    for my $attr (@$attrs) {
-        next if $attr eq $pk;
-        next if $attr eq 'dbh';
-        next unless exists $existing->{$attr};
-
-        my $meta     = $class_name->column_meta($attr) // {};
-        my $isa      = $meta->{isa} // 'Str';
-        my $expected = $self->_type_for($driver, $isa, $meta);
-
-        my $actual = $existing->{$attr}{TYPE_NAME} // '';
-        if ( uc($expected) ne uc($actual) ) {
-            push @changes,
-                "TYPE MISMATCH $attr: expected $expected, got $actual";
-        }
     }
 
     return @changes;

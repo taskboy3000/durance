@@ -9,6 +9,15 @@ This document provides guidelines for agents working on this codebase.
 - **Database**: SQLite via DBI/DBD::SQLite
 - **Testing**: Test2::Suite
 
+## Project Purpose
+This project implements a web application framework using Mojolicious, providing:
+- RESTful API endpoints for user management
+- ORM integration with SQLite for data persistence
+- Test-driven development workflow with Test2::Suite
+- Example models demonstrating Perl OO patterns
+
+The application serves as a template for building Perl-based web services with modern development practices.
+
 ## Directory Structure
 
 ```
