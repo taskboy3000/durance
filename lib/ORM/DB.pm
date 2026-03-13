@@ -48,6 +48,34 @@ sub disconnect_all {
     %HANDLES = ();
 }
 
+sub isDSNValid ($self, $dsn = undef) {
+    # Handle class method call - convert to instance
+    if (!ref $self) {
+        $self = $self->new;
+    }
+    
+    $dsn //= $self->dsn;
+    
+    my $username = $self->username // '';
+    my $password = $self->password // '';
+    my $options = $self->driver_options;
+    
+    my $dbh = eval {
+        DBI->connect($dsn, $username, $password, $options);
+    };
+    
+    my $error = $@;
+    
+    if ($dbh) {
+        $dbh->disconnect;
+        return wantarray ? (1, undef) : 1;
+    }
+    
+    $error =~ s/DBI connect failed: // if $error;
+    
+    return wantarray ? (0, $error) : 0;
+}
+
 1;
 
 __END__

@@ -93,6 +93,17 @@ subtest 'ORM::DB - attributes and methods' => sub {
         ok(!$dbh->ping, 'handle is disconnected after disconnect_all');
     };
 
+    subtest 'isDSNValid' => sub {
+        my ($valid, $error) = TestDB->isDSNValid;
+        is($valid, 1, 'valid DSN returns true');
+        is($error, undef, 'no error for valid DSN');
+
+        my ($invalid, $err_msg) = TestDB->isDSNValid('dbi:SQLite:dbname=/nonexistent/path/test.db');
+        is($invalid, 0, 'invalid DSN returns false');
+        ok($err_msg, 'error message returned for invalid DSN');
+        like($err_msg, qr/unable to open database file/, 'error message is clean');
+    };
+
     package main;
 };
 
