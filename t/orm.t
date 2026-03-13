@@ -823,6 +823,122 @@ subtest 'ORM::Model - Relationship functions' => sub {
     };
 };
 
+subtest 'ORM::Model - JOIN Support' => sub {
+    my $db = TestDB->new;
+    my $dbh = $db->dbh;
+
+    package MyApp::Model::Company;
+    use Moo;
+    extends 'TestModel';
+    use ORM::DSL;
+
+    tablename 'companies';
+    column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+    column name => (is => 'rw', isa => 'Str', required => 1);
+
+    has_many employees => (is => 'rw', isa => 'MyApp::Model::Employee');
+
+    package MyApp::Model::Employee;
+    use Moo;
+    extends 'TestModel';
+    use ORM::DSL;
+
+    tablename 'employees';
+    column id         => (is => 'rw', isa => 'Int', primary_key => 1);
+    column company_id => (is => 'rw', isa => 'Int');
+    column name       => (is => 'rw', isa => 'Str', required => 1);
+    column department => (is => 'rw', isa => 'Str');
+
+    belongs_to company => (is => 'rw', isa => 'MyApp::Model::Company', foreign_key => 'company_id');
+
+    package main;
+
+    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $company_model = MyApp::Model::Company->new(db => $db);
+    my $employee_model = MyApp::Model::Employee->new(db => $db);
+    $schema->create_table($company_model);
+    $schema->create_table($employee_model);
+
+    my $acme = MyApp::Model::Company->create({ name => 'Acme Corp' });
+    my $globex = MyApp::Model::Company->create({ name => 'Globex Inc' });
+
+    MyApp::Model::Employee->create({ company_id => $acme->id, name => 'Alice', department => 'Engineering' });
+    MyApp::Model::Employee->create({ company_id => $acme->id, name => 'Bob', department => 'Sales' });
+    MyApp::Model::Employee->create({ company_id => $globex->id, name => 'Carol', department => 'Engineering' });
+
+    subtest 'JOIN-1: Relationship introspection methods' => sub {
+        my $has_many = MyApp::Model::Company->has_many_relations;
+        ok(exists $has_many->{employees}, 'has_many_relations returns employees');
+        is($has_many->{employees}{isa}, 'MyApp::Model::Employee', 'has correct isa');
+        is($has_many->{employees}{_relationship_type}, 'has_many', 'has correct relationship type');
+
+        my $belongs_to = MyApp::Model::Employee->belongs_to_relations;
+        ok(exists $belongs_to->{company}, 'belongs_to_relations returns company');
+        is($belongs_to->{company}{isa}, 'MyApp::Model::Company', 'has correct isa');
+        is($belongs_to->{company}{_relationship_type}, 'belongs_to', 'has correct relationship type');
+
+        my $related = MyApp::Model::Company->related_to('employees');
+        is($related->{isa}, 'MyApp::Model::Employee', 'related_to returns correct meta');
+    };
+
+    subtest 'JOIN-2: add_joins method chains correctly' => sub {
+        my $rs = MyApp::Model::Employee->where({});
+        my $rs2 = $rs->add_joins('company');
+        is($rs2, $rs, 'add_joins returns $self for chaining');
+        ok(scalar @{$rs->join_specs} > 0, 'join_specs has entries');
+    };
+
+    subtest 'JOIN-3: belongs_to JOIN query' => sub {
+        my @emps = MyApp::Model::Employee->where({})
+            ->add_joins('company')
+            ->order('employees.name')
+            ->all;
+
+        is(scalar @emps, 3, 'JOIN returns all employees');
+        ok($emps[0]->name, 'Alice has data');
+    };
+
+    subtest 'JOIN-4: has_many JOIN query' => sub {
+        my @cos = MyApp::Model::Company->where({})
+            ->add_joins('employees')
+            ->all;
+
+        ok(scalar @cos > 0, 'JOIN returns companies');
+    };
+
+    subtest 'JOIN-5: Multiple JOINs' => sub {
+        my @emps = MyApp::Model::Employee->where({ department => 'Engineering' })
+            ->add_joins('company')
+            ->all;
+
+        is(scalar @emps, 2, 'Engineering dept has 2 employees');
+    };
+
+    subtest 'JOIN-6: JOIN with WHERE conditions' => sub {
+        my @emps = MyApp::Model::Employee->where({ 'companies.name' => 'Acme Corp' })
+            ->add_joins('company')
+            ->all;
+
+        is(scalar @emps, 2, 'Acme Corp has 2 employees');
+    };
+
+    subtest 'JOIN-7: Explicit hash override' => sub {
+        my @emps = MyApp::Model::Employee->where({})
+            ->add_joins({ company => { type => 'INNER', on => 'companies.id = employees.company_id' } })
+            ->all;
+
+        is(scalar @emps, 3, 'INNER JOIN returns all employees');
+    };
+
+    subtest 'JOIN-8: Mixed string and hash JOINs' => sub {
+        my @emps = MyApp::Model::Employee->where({})
+            ->add_joins('company', { company => { type => 'LEFT' } })
+            ->all;
+
+        is(scalar @emps, 3, 'Mixed JOINs return all employees');
+    };
+};
+
 subtest 'ORM::Model - Validation functions' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;

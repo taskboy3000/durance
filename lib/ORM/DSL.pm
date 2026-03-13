@@ -145,12 +145,23 @@ sub load_into {
         # Interesting that the ORM::Model package maintains this association spec
         $_has_many{$pkg}{$name} = \%opts;
         
+        # Tag with relationship type
+        $_has_many{$pkg}{$name}{_relationship_type} = 'has_many';
+        
         my $isa = $opts{isa};
         my $foreign_key = $opts{foreign_key};
         
         unless ($foreign_key) {
-            $foreign_key = "${name}_id";
+            # Default foreign key is derived from the parent class's singular name
+            # e.g., Company has_many employees -> employees.company_id
+            # Extract short name from package: MyApp::Model::Company -> Company -> company
+            my $parent_name = $pkg;
+            $parent_name =~ s/.+::(.+?)$/$1/;
+            $parent_name = lc($parent_name);
+            $foreign_key = "${parent_name}_id";
         }
+        
+        $_has_many{$pkg}{$name}{foreign_key} = $foreign_key;
         
         *{"${pkg}::${name}"} = sub ($self) {
             my $model_class = $isa;
@@ -184,6 +195,9 @@ sub load_into {
     *{"${caller}::belongs_to"} = sub ($name, %opts) {
         my $pkg = caller;
         $_belongs_to{$pkg}{$name} = \%opts;
+        
+        # Tag with relationship type
+        $_belongs_to{$pkg}{$name}{_relationship_type} = 'belongs_to';
         
         my $isa = $opts{isa};
         my $foreign_key = $opts{foreign_key} // "${name}_id";

@@ -119,6 +119,22 @@ sub attributes ($self) {
     return $ORM::Model::_columns{$class} // [];
 }
 
+sub has_many_relations ($class) {
+    my $class_name = ref $class || $class;
+    return $ORM::DSL::_has_many{$class_name} // {};
+}
+
+sub belongs_to_relations ($class) {
+    my $class_name = ref $class || $class;
+    return $ORM::DSL::_belongs_to{$class_name} // {};
+}
+
+sub related_to ($class, $name) {
+    my $class_name = ref $class || $class;
+    return $ORM::DSL::_has_many{$class_name}{$name} 
+        // $ORM::DSL::_belongs_to{$class_name}{$name};
+}
+
 sub find ( $class, $id ) {
     my $pk    = $class->primary_key;
     my $table = $class->table;

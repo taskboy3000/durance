@@ -11,9 +11,10 @@ has 'conditions' => (is => 'rw', default => sub { {} });
 has 'order_by' => (is => 'rw', default => sub { [] });
 has 'limit_val' => (is => 'rw');
 has 'offset_val' => (is => 'rw');
+has 'join_specs' => (is => 'rw', default => sub { [] });
 
-sub where ($self, $conditions) {
-    $self->conditions({ %{$self->conditions}, %$conditions });
+sub add_joins ($self, @relations) {
+    push @{$self->join_specs}, @relations;
     return $self;
 }
 
@@ -55,6 +56,85 @@ sub all ($self) {
     }
 
     my $sql = "SELECT * FROM $table";
+
+    # Build JOIN clauses
+    my @join_parts;
+    for my $rel (@{$self->join_specs}) {
+        my ($rel_name, $rel_opts);
+
+        if (ref $rel eq 'HASH') {
+            ($rel_name, $rel_opts) = %$rel;
+        }
+        else {
+            $rel_name = $rel;
+            $rel_opts = {};
+        }
+
+        # Look up relationship metadata
+        my $meta = $class->related_to($rel_name);
+
+        # If no metadata found and it's a hash override, use explicit settings
+        if ($meta && ref $meta eq 'HASH') {
+            # Determine JOIN type (default LEFT)
+            my $join_type = $rel_opts->{type} // 'LEFT';
+
+            # Determine tables and keys
+            my $related_class = $meta->{isa};
+            my $related_table = $related_class->table;
+            my $local_pk = $class->primary_key;
+            my $local_table = $table;
+
+            # Skip if this table is already joined (avoid duplicates)
+            my $already_joined = 0;
+            for my $existing (@join_parts) {
+                if ($existing =~ /\b$related_table\b/) {
+                    $already_joined = 1;
+                    last;
+                }
+            }
+            next if $already_joined;
+
+            # Build ON clause based on relationship type
+            my $on_clause;
+            if ($meta->{_relationship_type} eq 'belongs_to') {
+                # belongs_to: foreign key is on local table
+                # e.g., Employee belongs_to Company: employees.company_id = companies.id
+                my $foreign_key = $meta->{foreign_key} // "${rel_name}_id";
+                $on_clause = "$related_table.id = $local_table.$foreign_key";
+            }
+            else {
+                # has_many: foreign key is on related table
+                # e.g., Company has_many Employees: employees.company_id = companies.id
+                my $foreign_key = $meta->{foreign_key} // "${rel_name}_id";
+                $on_clause = "$related_table.$foreign_key = $local_table.$local_pk";
+            }
+
+            # Allow override
+            $on_clause = $rel_opts->{on} // $on_clause;
+
+            push @join_parts, "$join_type JOIN $related_table ON $on_clause";
+        }
+        elsif ($rel_opts && $rel_opts->{on}) {
+            # Explicit override without metadata - use explicit settings
+            my $join_type = $rel_opts->{type} // 'LEFT';
+            my $related_table = $rel_opts->{table} // $rel_name;
+
+            # Skip if this table is already joined (avoid duplicates)
+            my $already_joined = 0;
+            for my $existing (@join_parts) {
+                if ($existing =~ /\b$related_table\b/) {
+                    $already_joined = 1;
+                    last;
+                }
+            }
+            unless ($already_joined) {
+                push @join_parts, "$join_type JOIN $related_table ON $rel_opts->{on}";
+            }
+        }
+    }
+
+    $sql .= " " . join(' ', @join_parts) if @join_parts;
+
     $sql .= " WHERE " . join(' AND ', @where_parts) if @where_parts;
     $sql .= " ORDER BY " . join(', ', @{$self->order_by}) if @{$self->order_by};
     if (defined $self->limit_val) {
@@ -161,6 +241,8 @@ It lazily executes queries until methods like C<all>, C<first>, or C<count> are 
 
 =item * offset_val - OFFSET value (read-write)
 
+=item * join_specs - Arrayref of JOIN specifications (read-write)
+
 =back
 
 =head1 METHODS
@@ -199,6 +281,24 @@ Add LIMIT clause.
     my $rs = $rs->offset(20);
 
 Add OFFSET clause. Note: Most databases require LIMIT when using OFFSET.
+
+=head2 add_joins
+
+    my $rs = $rs->add_joins('company');
+    my $rs = $rs->add_joins('company', 'department');
+    my $rs = $rs->add_joins({ company => { type => 'INNER', on => 'companies.id = employees.company_id' } });
+
+Add SQL JOIN clauses to the query. Supports:
+
+=over 4
+
+=item * String API: Relationship names that match defined has_many or belongs_to relationships
+
+=item * Hash API: Explicit override with custom JOIN type and ON clause
+
+=back
+
+Returns $self for method chaining.
 
 =head2 all
 
