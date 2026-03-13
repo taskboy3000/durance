@@ -5,7 +5,7 @@ use warnings;
 
 use Test2::V0;
 use File::Temp qw(tempfile);
-use Carp qw(croak);
+
 
 subtest 'opencode --version works and returns valid format' => sub {
     my $version = `opencode --version 2>&1`;
@@ -23,7 +23,7 @@ subtest 'opencode-version tool returns valid JSON' => sub {
     
     ok(-e $tool_path, 'tool file exists');
     
-    open my $fh, '<', $tool_path or croak "Cannot open $tool_path: $!";
+    open my $fh, '<', $tool_path or die "Cannot open $tool_path: $!";
     my $content = do { local $/; <$fh> };
     close $fh;
     

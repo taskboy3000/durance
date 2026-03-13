@@ -117,7 +117,7 @@ sub methodName ($self, @args) {
 ```
 
 ### Import Style
-- Use explicit import lists: `use Carp qw(croak);` not `use Carp;`
+- Use explicit import lists for modules: `use File::Temp qw(tempfile);` not `use File::Temp;`
 - Group imports: core, third-party, local modules.  
 - Sort each group alphabetically
 
@@ -135,7 +135,7 @@ sub my_function ($self, $arg1, $arg2 = 'default') {
 ```
 
 ### Error Handling
-- Use `die` from Carp for user-facing errors
+- Use `die` for user-facing errors
 - Use `warn` for warnings
 - Use DBI's `RaiseError => 1` for database errors
 - Use `//` (defined-or) not `||` for defaults

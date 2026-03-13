@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use experimental 'signatures';
 
-use Carp qw(croak);
+
 use Moo;
 
 our %COLUMN_META;
@@ -31,7 +31,7 @@ sub _build_db {
     
     my $db_class = _db_class_for($pkg);
     eval "require $db_class";
-    croak "Cannot load DB class $db_class: $@" if $@;
+    die "Cannot load DB class $db_class: $@" if $@;
     
     return $db_class->new;
 }
@@ -64,7 +64,7 @@ sub table ($self) {
     }
     use strict;
 
-    croak("assert - tablename not set");
+    die("assert - tablename not set");
 };
 
 sub column_meta ( $class, $column ) {
@@ -190,7 +190,7 @@ sub update ($self) {
     my $dbh   = $self->db->dbh;
 
     my $pk      = ref($self)->primary_key;
-    my $pk_val = $self->{$pk} // croak "Cannot update without primary key value";
+    my $pk_val = $self->{$pk} // die "Cannot update without primary key value";
 
     my $now = scalar localtime;
     if (ref($self)->can('columns')) {
@@ -225,7 +225,7 @@ sub delete ($self) {
     my $dbh   = $self->db->dbh;
 
     my $pk      = ref($self)->primary_key;
-    my $pk_val = $self->{$pk} // croak "Cannot delete without primary key value";
+    my $pk_val = $self->{$pk} // die "Cannot delete without primary key value";
 
     my $stmt = "DELETE FROM $table WHERE $pk = ?";
     my $sth  = $dbh->prepare($stmt);
@@ -330,7 +330,7 @@ Setters generated for columns include automatic validation and coercion:
 =over 4
 
 =item * B<Length enforcement>: If C<length> is set, assigning a value longer
-than the limit will croak. This applies regardless of database type.
+than the limit will die. This applies regardless of database type.
 
 =item * B<Bool coercion>: Columns with C<isa =E<gt> 'Bool'> automatically
 coerce values using Perl truthiness: truthy values become 1, falsy become 0.

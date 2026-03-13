@@ -5,7 +5,7 @@ use warnings;
 use experimental 'signatures';
 use utf8;
 
-use Carp qw(croak);
+
 use DBI;
 use Moo;
 
@@ -29,7 +29,7 @@ sub dbh ($self) {
         return $HANDLES{$key};
     }
 
-    my $dsn  = $self->dsn // croak 'dsn not configured';
+    my $dsn  = $self->dsn // die 'dsn not configured';
     my $dbh  = DBI->connect(
         $dsn,
         $self->username,

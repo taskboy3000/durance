@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use experimental 'signatures';
 use Moo;
-use Carp qw(croak);
+
 
 has 'class' => (is => 'ro', required => 1);
 has 'conditions' => (is => 'rw', default => sub { {} });

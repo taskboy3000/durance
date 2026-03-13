@@ -3,7 +3,7 @@ package ORM::DSL;
 use strict;
 use warnings;
 use experimental 'signatures';
-use Carp qw(croak);
+
 
 # Package variables from ORM::Model that we need to access
 our ( %_has_many, %_belongs_to, %_validations );
@@ -86,18 +86,18 @@ sub load_into {
                     if (exists $validations->{required}
                         && $validations->{required} && !defined $val)
                     {
-                        croak "$name is required";
+                        die "$name is required";
                     }
                     if (exists $validations->{format} && defined $val) {
                         unless ($val =~ $validations->{format}) {
-                            croak "Invalid $name: $val";
+                            die "Invalid $name: $val";
                         }
                     }
                     if ($is_bool) {
                         $val = $val ? 1 : 0;
                     }
                     if (defined $col_length && length($val) > $col_length) {
-                        croak "$name exceeds maximum length of $col_length";
+                        die "$name exceeds maximum length of $col_length";
                     }
                     $self->{$name} = $val;
                     return $self;
@@ -161,7 +161,7 @@ sub load_into {
             my $pk = $self->primary_key;
             my $pk_val = $self->$pk;
             
-            return croak "Cannot create related object without primary key" unless defined $pk_val;
+            die "Cannot create related object without primary key" unless defined $pk_val;
             
             my %data = (@args, $foreign_key => $pk_val);
             return $model_class->create(\%data);

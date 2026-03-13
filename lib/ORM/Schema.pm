@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use experimental 'signatures';
 
-use Carp qw(croak);
+
 use Cwd;
 use FindBin;
 use File::Find;
@@ -66,14 +66,14 @@ sub _get_dbh_for {
 
     if (!$loaded) {
         eval "require $db_class";
-        croak "Cannot load DB class $db_class: $@" if $@;
+        die "Cannot load DB class $db_class: $@" if $@;
     }
 
     if ($db_class->can('dbh')) {
         return $db_class->dbh;
     }
 
-    croak "No database handle available. "
+    die "No database handle available. "
         . "Set dbh on schema or ensure $db_class can provide one.";
 }
 
@@ -179,7 +179,7 @@ sub ddl_for_class ( $self, $class_name, $driver = undef ) {
 sub create_table ( $self, $model ) {
     my $class = ref $model;
     my $table = $model->table;
-    my $dbh   = $model->dbh // croak 'No database handle for model ' . $class;
+    my $dbh   = $model->dbh // die 'No database handle for model ' . $class;
 
     if ( $self->table_exists($table) ) {
         return $self->migrate($model);
@@ -195,7 +195,7 @@ sub create_table ( $self, $model ) {
 
 sub table_exists ( $self, $model ) {
     my $table = $model->table;
-    my $dbh = $model->dbh // croak 'No database handle';
+    my $dbh = $model->dbh // die 'No database handle';
 
     my $sth  = $dbh->table_info( undef, undef, $table, undef );
     my @info = $sth->fetchrow_array;
@@ -206,7 +206,7 @@ sub table_exists ( $self, $model ) {
 
 sub column_info ( $self, $model, $column ) {
     my $table = $model->table;
-    my $dbh = $model->dbh // croak 'No database handle for model ' , ref $model;
+    my $dbh = $model->dbh // die 'No database handle for model ' , ref $model;
 
     my $sth = $dbh->column_info( undef, undef, $table, $column );
     return undef unless $sth;
@@ -219,7 +219,7 @@ sub column_info ( $self, $model, $column ) {
 
 sub table_info ( $self, $model ) {
     my $table = $model->table;
-    my $dbh = $model->dbh // croak 'No database handle for ' . ref $model;
+    my $dbh = $model->dbh // die 'No database handle for ' . ref $model;
 
     my $sth = $dbh->column_info( undef, undef, $table, '%' );
     return () unless $sth;
@@ -243,7 +243,7 @@ sub _get_app_library_basedir ($self, $modelOrClass) {
     $incKey.= '.pm';
 
     if (!exists $INC{$incKey}) {
-        croak("Cannot find '$incKey' in \%INC");
+        die("Cannot find '$incKey' in \%INC");
     }
 
     # Find the lib base on disk
@@ -262,7 +262,7 @@ sub _get_app_library_basedir ($self, $modelOrClass) {
     }
 
     if (!$appBaseDir || !-e $appBaseDir) {
-        croak("Could not find where all the models files are on disk: '$appBaseDir'")
+        die("Could not find where all the models files are on disk: '$appBaseDir'")
     }
 
     return $appBaseDir;
@@ -293,7 +293,7 @@ sub get_all_models_for_app ($self, $modelOrClass) {
     my $appBaseDir = $self->_get_app_library_basedir($modelOrClass);
     my $modelsBaseDir = $appBaseDir . '/Model';
     if (!-e $modelsBaseDir) {
-        croak("Expected models in '$modelsBaseDir' but this directory does not exist");
+        die("Expected models in '$modelsBaseDir' but this directory does not exist");
     }
 
     my $orgDir = getcwd();
@@ -328,7 +328,7 @@ sub migrate_all ($self, $modelOrClass) {
 sub migrate ( $self, $model) {
     my $class = ref $model;
     my $table = $model->table;
-    my $dbh   = $model->dbh // croak 'No database handle';
+    my $dbh   = $model->dbh // die 'No database handle';
 
     my $driver = $self->_detect_driver($dbh); # Is this needed?
 
