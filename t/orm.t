@@ -34,6 +34,8 @@ subtest 'ORM::Model - Basic attributes' => sub {
         $modelClass->import;
 
         next if !$modelClass->can('table');
+        ok($modelClass->table, "Got table name from $modelClass");
+
         printf("\tFound model class '%s'\n", $modelClass);
         if (my $table = $modelClass->table) {
             printf("\t\t-> manages table '%s'\n",
