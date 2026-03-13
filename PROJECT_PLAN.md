@@ -1210,12 +1210,12 @@ Test that created_at and updated_at are automatically populated.
 
 ---
 
-## Test Coverage: Complex ResultSet Queries
+## Test Coverage: Complex ResultSet Queries ✓ IN PROGRESS
 
 ### Goal
 Test ResultSet with various query operators and conditions.
 
-### Discrete Steps
+### Part A: Test Existing Features (6 steps)
 
 #### Step RQ-1: Test where() with comparison operators
 - Add records with numeric values
@@ -1226,6 +1226,38 @@ Test ResultSet with various query operators and conditions.
 - Add records with string values
 - Query with `{ name => { 'LIKE' => 'J%' } }`
 - Assert pattern matching works
+
+#### Step RQ-3: Test where() with multiple conditions
+- Query with multiple AND conditions
+- Assert all conditions applied
+
+#### Step RQ-4: Test order() with multiple columns
+- Add records
+- Query with order('name', 'age')
+- Assert correct multi-column sorting
+
+#### Step RQ-5: Test order() with DESC
+- Query with order('name DESC')
+- Assert descending order
+
+#### Step RQ-6: Test offset() without limit
+- Add records
+- Query with offset(2)
+- Assert skips first 2 records
+
+### Part B: Add JOIN Support (Future Feature)
+
+Currently the ORM supports basic relationships via separate queries (N+1 problem).
+Future work could add proper SQL JOIN support.
+
+| Feature | Description |
+|---------|-------------|
+| `has_one` | One-to-one relationship |
+| JOIN queries | Fetch related objects via SQL JOIN |
+| `many_to_many` | Junction table relationships |
+
+### Files Modified
+- `t/orm.t` - Added complex query tests
 
 #### Step RQ-3: Test where() with multiple conditions
 - Query with multiple AND conditions

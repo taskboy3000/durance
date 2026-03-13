@@ -582,6 +582,177 @@ subtest 'ORM::Model - Auto-timestamps' => sub {
     };
 };
 
+subtest 'ORM::Model - Complex ResultSet Queries' => sub {
+    my $db = TestDB->new;
+    my $dbh = $db->dbh;
+    my $schema = ORM::Schema->new(dbh => $dbh);
+
+    subtest 'RQ-1: where() with comparison operators' => sub {
+        package MyApp::Model::CompareTest;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'compare_test';
+        column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name => (is => 'rw', isa => 'Str');
+        column age  => (is => 'rw', isa => 'Int');
+
+        package main;
+
+        my $model = MyApp::Model::CompareTest->new(db => $db);
+        $schema->create_table($model);
+
+        MyApp::Model::CompareTest->create({ name => 'Alice', age => 25 });
+        MyApp::Model::CompareTest->create({ name => 'Bob', age => 30 });
+        MyApp::Model::CompareTest->create({ name => 'Carol', age => 35 });
+
+        my @adults = MyApp::Model::CompareTest->where({ age => { '>=' => 18 }})->all;
+        is(scalar @adults, 3, '>= 18 returns 3');
+
+        my @seniors = MyApp::Model::CompareTest->where({ age => { '>' => 30 }})->all;
+        is(scalar @seniors, 1, '> 30 returns 1');
+        is($seniors[0]->name, 'Carol', 'senior is Carol');
+
+        my @young = MyApp::Model::CompareTest->where({ age => { '<' => 30 }})->all;
+        is(scalar @young, 1, '< 30 returns 1 (Alice, age 25)');
+        is($young[0]->name, 'Alice', 'youngest is Alice');
+    };
+
+    subtest 'RQ-2: where() with LIKE operator' => sub {
+        package MyApp::Model::LikeTest;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'like_test';
+        column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $model = MyApp::Model::LikeTest->new(db => $db);
+        $schema->create_table($model);
+
+        MyApp::Model::LikeTest->create({ name => 'John' });
+        MyApp::Model::LikeTest->create({ name => 'Jane' });
+        MyApp::Model::LikeTest->create({ name => 'Bob' });
+
+        my @j_names = MyApp::Model::LikeTest->where({ name => { 'LIKE' => 'J%' }})->all;
+        is(scalar @j_names, 2, 'LIKE J% returns 2');
+
+        my @ohn = MyApp::Model::LikeTest->where({ name => { 'LIKE' => '%ohn%' }})->all;
+        is(scalar @ohn, 1, 'LIKE %ohn% returns 1');
+        is($ohn[0]->name, 'John', 'found John');
+    };
+
+    subtest 'RQ-3: where() with multiple conditions' => sub {
+        package MyApp::Model::MultiCondTest;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'multi_cond_test';
+        column id      => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name    => (is => 'rw', isa => 'Str');
+        column status  => (is => 'rw', isa => 'Str');
+        column active  => (is => 'rw', isa => 'Int');
+
+        package main;
+
+        my $model = MyApp::Model::MultiCondTest->new(db => $db);
+        $schema->create_table($model);
+
+        MyApp::Model::MultiCondTest->create({ name => 'A', status => 'gold', active => 1 });
+        MyApp::Model::MultiCondTest->create({ name => 'B', status => 'silver', active => 1 });
+        MyApp::Model::MultiCondTest->create({ name => 'C', status => 'gold', active => 0 });
+
+        my @gold_active = MyApp::Model::MultiCondTest->where({
+            status => 'gold',
+            active => 1
+        })->all;
+        is(scalar @gold_active, 1, 'multiple conditions return 1');
+        is($gold_active[0]->name, 'A', 'gold active is A');
+    };
+
+    subtest 'RQ-4: order() with multiple columns' => sub {
+        package MyApp::Model::MultiOrderTest;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'multi_order_test';
+        column id    => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name  => (is => 'rw', isa => 'Str');
+        column score => (is => 'rw', isa => 'Int');
+
+        package main;
+
+        my $model = MyApp::Model::MultiOrderTest->new(db => $db);
+        $schema->create_table($model);
+
+        MyApp::Model::MultiOrderTest->create({ name => 'Alice', score => 100 });
+        MyApp::Model::MultiOrderTest->create({ name => 'Bob', score => 90 });
+        MyApp::Model::MultiOrderTest->create({ name => 'Carol', score => 100 });
+
+        my @by_name = MyApp::Model::MultiOrderTest->where({})->order('score DESC')->order('name ASC')->all;
+        is($by_name[0]->name, 'Alice', 'first: Alice (score 100, alphabetical)');
+        is($by_name[1]->name, 'Carol', 'second: Carol (score 100, alphabetical)');
+        is($by_name[2]->name, 'Bob', 'third: Bob (score 90)');
+    };
+
+    subtest 'RQ-5: order() with DESC' => sub {
+        package MyApp::Model::DescOrderTest;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'desc_order_test';
+        column id    => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name  => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $model = MyApp::Model::DescOrderTest->new(db => $db);
+        $schema->create_table($model);
+
+        MyApp::Model::DescOrderTest->create({ name => 'Alice' });
+        MyApp::Model::DescOrderTest->create({ name => 'Bob' });
+        MyApp::Model::DescOrderTest->create({ name => 'Carol' });
+
+        my @desc = MyApp::Model::DescOrderTest->where({})->order('name DESC')->all;
+        is($desc[0]->name, 'Carol', 'first in DESC: Carol');
+        is($desc[1]->name, 'Bob', 'second in DESC: Bob');
+        is($desc[2]->name, 'Alice', 'third in DESC: Alice');
+    };
+
+    subtest 'RQ-6: offset() without limit' => sub {
+        package MyApp::Model::OffsetTest;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'offset_test';
+        column id    => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name  => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $model = MyApp::Model::OffsetTest->new(db => $db);
+        $schema->create_table($model);
+
+        MyApp::Model::OffsetTest->create({ name => 'A' });
+        MyApp::Model::OffsetTest->create({ name => 'B' });
+        MyApp::Model::OffsetTest->create({ name => 'C' });
+        MyApp::Model::OffsetTest->create({ name => 'D' });
+        MyApp::Model::OffsetTest->create({ name => 'E' });
+
+        my @skip_two = MyApp::Model::OffsetTest->where({})->order('name ASC')->offset(2)->all;
+        is(scalar @skip_two, 3, 'offset(2) returns 3 records');
+        is($skip_two[0]->name, 'C', 'first after offset is C');
+    };
+};
+
 subtest 'ORM::Model - Relationship functions' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
