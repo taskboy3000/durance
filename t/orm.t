@@ -482,6 +482,93 @@ subtest 'ORM::Model - Relationship functions' => sub {
     };
 };
 
+subtest 'ORM::Model - Validation functions' => sub {
+    my $db = TestDB->new;
+    my $dbh = $db->dbh;
+    my $schema = ORM::Schema->new(dbh => $dbh);
+
+    subtest 'Format validation' => sub {
+        package MyApp::Model::FormatTest;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'format_test';
+        column id    => (is => 'rw', isa => 'Int', primary_key => 1);
+        column email => (is => 'rw', isa => 'Str');
+
+        validates email => (format => qr/@/);
+
+        package main;
+
+        my $model = MyApp::Model::FormatTest->new(db => $db);
+        $schema->create_table($model);
+
+        my $obj = MyApp::Model::FormatTest->new;
+        $obj->email('test@example.com');
+        is($obj->email, 'test@example.com', 'valid email accepted');
+
+        my $died = dies { $obj->email('invalid') };
+        ok($died, 'invalid email format dies');
+    };
+
+    subtest 'Length validation' => sub {
+        package MyApp::Model::LengthTest;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'length_test';
+        column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+        column code => (is => 'rw', isa => 'Str', length => 5);
+
+        package main;
+
+        my $model = MyApp::Model::LengthTest->new(db => $db);
+        $schema->create_table($model);
+
+        my $obj = MyApp::Model::LengthTest->new;
+        $obj->code('ABCDE');
+        is($obj->code, 'ABCDE', 'value within length accepted');
+
+        my $died = dies { $obj->code('ABCDEF') };
+        ok($died, 'value exceeding length dies');
+    };
+
+    subtest 'Bool coercion' => sub {
+        package MyApp::Model::BoolTest;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'bool_test';
+        column id      => (is => 'rw', isa => 'Int', primary_key => 1);
+        column enabled => (is => 'rw', isa => 'Bool', default => 1);
+
+        package main;
+
+        my $model = MyApp::Model::BoolTest->new(db => $db);
+        $schema->create_table($model);
+
+        my $obj = MyApp::Model::BoolTest->new;
+
+        $obj->enabled('yes');
+        is($obj->enabled, 1, 'truthy string coerced to 1');
+
+        $obj->enabled(0);
+        is($obj->enabled, 0, 'zero stays 0');
+
+        $obj->enabled('');
+        is($obj->enabled, 0, 'empty string coerced to 0');
+
+        $obj->enabled(42);
+        is($obj->enabled, 1, 'nonzero int coerced to 1');
+
+        my $fresh = MyApp::Model::BoolTest->new;
+        is($fresh->enabled, 1, 'Bool default 1 returned');
+    };
+};
+
 subtest 'ORM::Model - Basic attributes' => sub {
     my $myApp = MyApp::DB->new();
     my @modelClass = ORM::Schema->get_all_models_for_app($myApp);

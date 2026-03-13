@@ -78,7 +78,6 @@ sub load_into {
         }
 
         my $is = $opts{is} // 'rw';
-        my $validations = $ORM::Model::_validations{$pkg}{$name} // {};
         my $col_isa     = lc($opts{isa} // '');
         my $col_length  = $opts{length};
         my $is_bool     = ($col_isa eq 'bool') ? 1 : 0;
@@ -86,12 +85,18 @@ sub load_into {
         if ( $is eq 'rw' ) {
             *{"${pkg}::${name}"} = sub {
                 my ( $self, $val ) = @_;
+                
+                # Look up validations at RUNTIME, not definition time
+                my $validations = $ORM::Model::_validations{$pkg}{$name} // {};
+                
+                # Check required validation BEFORE defined check
+                if (exists $validations->{required}
+                    && $validations->{required} && !defined $val)
+                {
+                    die "$name is required";
+                }
+                
                 if ( defined $val ) {
-                    if (exists $validations->{required}
-                        && $validations->{required} && !defined $val)
-                    {
-                        die "$name is required";
-                    }
                     if (exists $validations->{format} && defined $val) {
                         unless ($val =~ $validations->{format}) {
                             die "Invalid $name: $val";
@@ -199,7 +204,7 @@ sub load_into {
     # Export validates function
     *{"${caller}::validates"} = sub ($name, %opts) {
         my $pkg = caller;
-        $_validations{$pkg}{$name} = \%opts;
+        $ORM::Model::_validations{$pkg}{$name} = \%opts;
         return;
     };
 }
