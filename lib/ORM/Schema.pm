@@ -413,8 +413,10 @@ sub ensure_schema_valid ( $self, $modelOrClass ) {
 
     die "Schema validation failed for '$class':\n"
       . "$change_list\n\n"
-      . "To fix this, run:\n"
+      . "To fix this model, run:\n"
       . "  my \$schema = ORM::Schema->new(dbh => \$dbh);\n"
+      . "  \$schema->sync_table('$class');\n\n"
+      . "Or to migrate all models at once:\n"
       . "  \$schema->migrate_all('${app_name}::DB');\n";
 }
 
@@ -592,7 +594,9 @@ model definition.  The error message includes:
 
 =item * What is wrong (missing table or missing columns)
 
-=item * A suggested migration command to fix it
+=item * A C<sync_table> command to fix that specific model
+
+=item * A C<migrate_all> command to fix all models at once
 
 =back
 

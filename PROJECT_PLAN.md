@@ -387,6 +387,11 @@ developer experience and catch errors early.
 * Analyze how each Perl package meets the needs of the framework
 * Find where modules are not using a single responsibility principle
 * Revise t/orm.t to exercise all public methods (verify no gaps remain)
+* Extract relationship-gathering logic in ResultSet::add_joins into a shared
+  helper (e.g., ORM::Model->all_relations) to avoid duplication when new
+  relationship types like `has_one` are added
+* ✓ COMPLETED: ensure_schema_valid now suggests `sync_table($model)` for
+  single-model failures, with `migrate_all` as a secondary option
 
 ---
 

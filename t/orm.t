@@ -1174,8 +1174,10 @@ subtest 'ORM::Schema - Schema Validation' => sub {
             'error includes validation failed header');
         like($died, qr/ADD COLUMN phone/,
             'error includes specific missing column');
+        like($died, qr/sync_table.*MissingCol/,
+            'error suggests sync_table for this model');
         like($died, qr/migrate_all/,
-            'error includes migration command suggestion');
+            'error also suggests migrate_all');
         like($died, qr/MyApp::DB/,
             'error includes app DB class name');
     };
@@ -1186,8 +1188,10 @@ subtest 'ORM::Schema - Schema Validation' => sub {
         ok($died, 'ensure_schema_valid dies for missing table');
         like($died, qr/does not exist/,
             'error mentions table does not exist');
+        like($died, qr/sync_table.*MissingTable/,
+            'error suggests sync_table for this model');
         like($died, qr/migrate_all/,
-            'error includes migration suggestion');
+            'error also suggests migrate_all');
     };
 };
 
