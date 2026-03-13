@@ -345,7 +345,7 @@ sub migrate ( $self, $model) {
 
     # This is an existing table
     my %existing;
-    for my $col ( $self->table_info($table) ) {
+    for my $col ( $self->table_info($model) ) {
         $existing{ $col->{COLUMN_NAME} } = 1;
     }
 
@@ -383,7 +383,7 @@ sub sync_table ( $self, $class_or_model ) {
 
     if ( !$self->table_exists($model) ) {
         $self->create_table($model);
-        return ["Created table: $class->table"];
+        return ["Created table: " . $model->table];
     }
 
     my @changes = @{$self->pending_changes($model)};
