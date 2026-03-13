@@ -47,11 +47,21 @@ sub db {
         return $self->{db};
     }
     
-    # Derive DB class and create instance
-    my $db_class = $class->_db_class_for;
-    eval "require $db_class";
-    die "Cannot load DB class $db_class: $@" if $@;
-    return $db_class->new;
+    # Class: check for cached db instance (package variable)
+    my $cache_key = "_db_cache";
+    {
+        no strict 'refs';
+        return $$class{$cache_key} if exists $$class{$cache_key};
+        
+        # Create and cache new instance
+        my $db_class = $class->_db_class_for;
+        eval "require $db_class";
+        die "Cannot load DB class $db_class: $@" if $@;
+        my $db = $db_class->new;
+        $$class{$cache_key} = $db;
+        
+        return $db;
+    }
 }
 
 sub _db_class_for ($class) {
