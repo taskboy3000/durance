@@ -22,6 +22,18 @@ package TestDB;
 use Moo;
 extends 'ORM::DB';
 sub _build_dsn { 'dbi:SQLite:dbname=:memory:' }
+sub disconnect_all { }  # Override to avoid clearing in-memory DB
+
+# Base model class for test models that use TestDB
+package TestModel;
+use Moo;
+extends 'ORM::Model';
+
+our $TEST_DB;
+
+sub _db {
+    return $TEST_DB // die "TestDB not set";
+}
 
 package main;
 
@@ -198,6 +210,190 @@ subtest 'ORM::Schema - table introspection' => sub {
         my $model = MyApp::Model::NonExistent2->new(db => $db);
         my @cols = $schema->table_info($model);
         is(scalar @cols, 0, 'table_info returns empty list');
+    };
+};
+
+subtest 'ORM::Schema - table creation and migration' => sub {
+    my $db = TestDB->new;
+    my $dbh = $db->dbh;
+    my $schema = ORM::Schema->new(dbh => $dbh);
+
+    subtest 'Step 3.1 & 3.2: Create model and test create_table' => sub {
+        package MyApp::Model::CreateTest;
+        use Moo;
+        extends 'ORM::Model';
+        use ORM::DSL;
+
+        tablename 'create_test';
+        column id    => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name  => (is => 'rw', isa => 'Str', required => 1);
+
+        package main;
+
+        my $model = MyApp::Model::CreateTest->new(db => $db);
+
+        ok(MyApp::Model::CreateTest->can('table'), 'Model can call table');
+        is(MyApp::Model::CreateTest->table, 'create_test', 'table name is correct');
+
+        ok(!$schema->table_exists($model), 'table does not exist yet');
+
+        my $result = $schema->create_table($model);
+        ok($result, 'create_table returns truthy');
+
+        ok($schema->table_exists($model), 'table exists after create_table');
+
+        my @cols = $schema->table_info($model);
+        is(scalar @cols, 2, 'table has 2 columns');
+
+        my %col_names = map { $_->{COLUMN_NAME} => 1 } @cols;
+        ok($col_names{id}, 'id column exists');
+        ok($col_names{name}, 'name column exists');
+    };
+
+    subtest 'Step 3.3: Test pending_changes detects missing columns' => sub {
+        package MyApp::Model::PendingCheck;
+        use Moo;
+        extends 'ORM::Model';
+        use ORM::DSL;
+
+        tablename 'create_test';
+        column id    => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name  => (is => 'rw', isa => 'Str', required => 1);
+        column extra => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $model = MyApp::Model::PendingCheck->new(db => $db);
+
+        my @pending = @{$schema->pending_changes($model)};
+        is(scalar @pending, 1, 'pending_changes shows 1 extra column in model not in DB');
+        like($pending[0], qr/ADD COLUMN extra/, 'pending includes extra column');
+    };
+
+    subtest 'Step 3.3b: Test sync_table creates table' => sub {
+        package MyApp::Model::SyncTest3;
+        use Moo;
+        extends 'ORM::Model';
+        use ORM::DSL;
+
+        tablename 'sync_test3';
+        column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+        column code => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $model = MyApp::Model::SyncTest3->new(db => $db);
+
+        my $changes = $schema->sync_table($model);
+        ok($schema->table_exists($model), 'sync_table creates table');
+        is(ref $changes, 'ARRAY', 'sync_table returns array ref');
+        is(scalar @$changes, 1, 'sync_table returns one change (table created)');
+    };
+};
+
+subtest 'ORM::Model - CRUD operations' => sub {
+    my $db = TestDB->new;
+    $TestModel::TEST_DB = $db;
+    my $dbh = $db->dbh;
+    my $schema = ORM::Schema->new(dbh => $dbh);
+
+    subtest 'Step 4.1-4.7: Full CRUD workflow' => sub {
+        package MyApp::Model::CrudFull;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'crud_full';
+        column id    => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name  => (is => 'rw', isa => 'Str', required => 1);
+        column email => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $crud_model = MyApp::Model::CrudFull->new(db => $db);
+        $schema->create_table($crud_model);
+
+        subtest '4.1: Model instantiation and metadata' => sub {
+            my $model = MyApp::Model::CrudFull->new;
+            ok($model->can('new'), 'Model can be instantiated');
+            is($model->columns->[0], 'id', 'first column is id');
+            is($model->columns->[1], 'name', 'second column is name');
+            is($model->primary_key, 'id', 'primary key is id');
+        };
+
+        subtest '4.2: Test create and insert' => sub {
+            my $user = MyApp::Model::CrudFull->create({ name => 'Alice', email => 'alice@test.com' });
+            ok($user, 'create returns object');
+            ok($user->id, 'id is set after create');
+            is($user->name, 'Alice', 'name is set');
+            is($user->email, 'alice@test.com', 'email is set');
+        };
+
+        subtest '4.3: Test find and all' => sub {
+            MyApp::Model::CrudFull->create({ name => 'Bob', email => 'bob@test.com' });
+            MyApp::Model::CrudFull->create({ name => 'Carol', email => 'carol@test.com' });
+
+            my $found = MyApp::Model::CrudFull->find(1);
+            ok($found, 'find returns object');
+            is($found->name, 'Alice', 'found correct record');
+
+            my @all = MyApp::Model::CrudFull->all;
+            is(scalar @all, 3, 'all returns 3 records');
+
+            my @found_where = MyApp::Model::CrudFull->where({ name => 'Bob' })->all;
+            is(scalar @found_where, 1, 'where returns 1 record');
+            is($found_where[0]->email, 'bob@test.com', 'where returns correct record');
+        };
+
+        subtest '4.4: Test update' => sub {
+            my $user = MyApp::Model::CrudFull->find(1);
+            $user->name('Alice Updated');
+            $user->update;
+
+            my $updated = MyApp::Model::CrudFull->find(1);
+            is($updated->name, 'Alice Updated', 'name updated in DB');
+        };
+
+        subtest '4.5: Test delete' => sub {
+            my $user = MyApp::Model::CrudFull->find(1);
+            $user->delete;
+
+            my @all = MyApp::Model::CrudFull->all;
+            is(scalar @all, 2, 'record deleted');
+        };
+
+        subtest '4.6: Test ResultSet chainable methods' => sub {
+            MyApp::Model::CrudFull->create({ name => 'Zara', email => 'zara@test.com' });
+            MyApp::Model::CrudFull->create({ name => 'Alice', email => 'alice@test.com' });
+            MyApp::Model::CrudFull->create({ name => 'Bob', email => 'bob@test.com' });
+
+            my @ordered = MyApp::Model::CrudFull->where({})->order('name')->all;
+            is($ordered[0]->name, 'Alice', 'first ordered by name');
+            is($ordered[1]->name, 'Bob', 'second ordered by name');
+            is($ordered[2]->name, 'Zara', 'third ordered by name');
+
+            my @limited = MyApp::Model::CrudFull->where({})->limit(2)->all;
+            is(scalar @limited, 2, 'limit returns 2');
+
+            my $first = MyApp::Model::CrudFull->where({})->first;
+            ok($first, 'first returns a record');
+
+            my $count = MyApp::Model::CrudFull->count;
+            is($count, 4, 'count returns 4');
+        };
+
+        subtest '4.7: Test to_hash and save' => sub {
+            my $user = MyApp::Model::CrudFull->find(1);
+            my $hash = $user->to_hash;
+
+            ok(exists $hash->{name}, 'to_hash includes name');
+            ok(exists $hash->{email}, 'to_hash includes email');
+            ok(!exists $hash->{db}, 'to_hash excludes db');
+
+            my $new_user = MyApp::Model::CrudFull->new(name => 'NewUser', email => 'new@test.com');
+            $new_user->save;
+            ok($new_user->id, 'save inserts and sets id');
+        };
     };
 };
 

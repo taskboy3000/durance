@@ -194,8 +194,8 @@ sub create_table ( $self, $model ) {
 }
 
 sub table_exists ( $self, $model ) {
-    my $table = $model->table;
-    my $dbh = $model->db->dbh // die 'No database handle';
+    my $table = ref $model ? $model->table : $model;
+    my $dbh = ref $model ? $model->db->dbh // die 'No database handle' : $self->dbh // die 'No database handle';
 
     my $sth  = $dbh->table_info( undef, undef, $table, undef );
     my @info = $sth->fetchrow_array;
@@ -368,22 +368,24 @@ sub migrate ( $self, $model) {
 
 sub sync_table ( $self, $class_or_model ) {
     my $class = ref $class_or_model || $class_or_model;
-    my $dbh   = $self->_get_dbh_for($class);
-    my $model = $class->new( dbh => $dbh );
+    
+    my $model;
+    if (ref $class_or_model) {
+        $model = $class_or_model;
+    } else {
+        my $db_class = $self->_db_class_for($class);
+        $model = $class->new(db => $db_class->new);
+    }
 
-    $self->_ensure_schema_info_table($dbh);
-
-    if ( !$self->table_exists( $class->table ) ) {
+    if ( !$self->table_exists($model) ) {
         $self->create_table($model);
-        $self->_record_version($dbh, "Created table: $class->table");
         return ["Created table: $class->table"];
     }
 
-    my @changes = @{$self->pending_changes($class)};
+    my @changes = @{$self->pending_changes($model)};
 
     if (@changes) {
         $self->migrate($model);
-        $self->_record_version($dbh, "Migrated: $class->table");
     }
 
     return \@changes;
@@ -396,6 +398,8 @@ sub pending_changes ( $self, $modelOrClass ) {
         eval "require $class";
         $class->import;
         $model = $class->new;
+    } else {
+        $model = $modelOrClass;
     }
 
     my $table = $model->table;
@@ -403,13 +407,13 @@ sub pending_changes ( $self, $modelOrClass ) {
 
     my @pending;
 
-    if ( !$self->table_exists($table) ) {
+    if ( !$self->table_exists($model) ) {
         push @pending, "Table $table does not exist";
         return \@pending;
     }
 
     my %existing;
-    for my $col ( $self->table_info($table) ) {
+    for my $col ( $self->table_info($model) ) {
         $existing{ $col->{COLUMN_NAME} } = $col;
     }
 

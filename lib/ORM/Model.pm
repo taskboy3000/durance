@@ -20,19 +20,17 @@ sub import {
     # Do nothing - users should explicitly use ORM::DSL
 }
 
-has db => (
-    is      => 'lazy',
-    builder => '_build_db',
-);
+sub db {
+    my $class = shift;
+    return $class->_db;
+}
 
-sub _build_db {
-    my ($self) = @_;
-    my $pkg = ref($self) || $self;
-    
+sub _db {
+    my $class = shift;
+    my $pkg = ref $class || $class;
     my $db_class = _db_class_for($pkg);
     eval "require $db_class";
     die "Cannot load DB class $db_class: $@" if $@;
-    
     return $db_class->new;
 }
 
@@ -71,27 +69,30 @@ sub column_meta ( $class, $column ) {
     return $COLUMN_META{$class}{$column} // {};
 }
 
-sub columns ($class) {
-    return $_columns{$class} // [];
+sub columns ($self) {
+    my $class = ref $self || $self;
+    return $ORM::Model::_columns{$class} // [];
 }
 
-sub primary_key ($class) {
-    return $_primary_key{$class} // 'id';
+sub primary_key ($self) {
+    my $class = ref $self || $self;
+    return $ORM::Model::_primary_key{$class} // 'id';
 }
 
-sub validations ($class, $name) {
-    return $_validations{$class}{$name} // {};
+sub validations ($self, $name) {
+    my $class = ref $self || $self;
+    return $ORM::Model::_validations{$class}{$name} // {};
 }
 
-sub attributes {
-    my ($class) = @_;
-    return $_columns{$class} // [];
+sub attributes ($self) {
+    my $class = ref $self || $self;
+    return $ORM::Model::_columns{$class} // [];
 }
 
 sub find ( $class, $id ) {
     my $pk    = $class->primary_key;
     my $table = $class->table;
-    my $dbh   = $class->db->dbh;
+    my $dbh   = $class->_db->dbh;
 
     my $stmt = "SELECT * FROM $table WHERE $pk = ?";
     my $sth  = $dbh->prepare($stmt);
@@ -102,12 +103,12 @@ sub find ( $class, $id ) {
 
     return undef unless $row;
 
-    return $class->new(%$row, db => $class->db);
+    return $class->new(%$row, db => $class->_db);
 }
 
 sub all ($class) {
     my $table = $class->table;
-    my $dbh   = $class->db->dbh;
+    my $dbh   = $class->_db->dbh;
 
     my $stmt = "SELECT * FROM $table";
     my $sth  = $dbh->prepare($stmt);
@@ -116,7 +117,7 @@ sub all ($class) {
     my @rows;
     while ( my $row = $sth->fetchrow_hashref ) {
         push @rows,
-          $class->new( %$row, db => $class->db );
+          $class->new( %$row, db => $class->_db );
     }
     $sth->finish;
 
@@ -138,7 +139,7 @@ sub where ( $class, $conditions = {} ) {
 
 # Mented to a called as a class method
 sub create ( $class, $data ) {
-    my $dbh = $class->db->dbh;
+    my $dbh = $class->_db->dbh;
 
     my $now = scalar localtime;
     if ($class->can('columns')) {
@@ -151,7 +152,7 @@ sub create ( $class, $data ) {
         }
     }
 
-    return $class->new( %$data, db => $class->db )->insert;
+    return $class->new( %$data, db => $class->_db )->insert;
 }
 
 sub _columns_info ($class) {
