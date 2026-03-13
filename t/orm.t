@@ -24,8 +24,9 @@ extends 'ORM::DB';
 use File::Temp qw(tempfile);
 
 sub _build_dsn { 
-    my ($tf) = tempfile(TEMPLATE => 'orm_test_XXXX', SUFFIX => '.db', DIR => '/tmp');
-    return "dbi:SQLite:dbname=$tf";
+    my ($fh, $filename) = tempfile(TEMPLATE => 'orm_test_XXXX', SUFFIX => '.db', DIR => '/tmp');
+    close $fh;  # We just need the filename, not the handle
+    return "dbi:SQLite:dbname=$filename";
 }
 
 # Base model class for test models that use TestDB
@@ -293,7 +294,6 @@ subtest 'ORM::Schema - table creation and migration' => sub {
 
 subtest 'ORM::Model - CRUD operations' => sub {
     my $db = TestDB->new;
-    $TestModel::TEST_DB = $db;
     my $dbh = $db->dbh;
     my $schema = ORM::Schema->new(dbh => $dbh);
 
