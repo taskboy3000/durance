@@ -2,6 +2,7 @@
 # All code copyright Joe Johnston <jjohn@taskboy.com> 2026
 use strict;
 use warnings;
+use experimental 'signatures';
 
 use File::Basename;
 use FindBin;
@@ -10,7 +11,6 @@ BEGIN {
 }
 
 use lib ("$::PROJ_ROOT/lib", "$::PROJ_ROOT/t");
-use experimental 'signatures';
 
 use Test2::V0;
 
