@@ -24,24 +24,15 @@ sub add_joins ($self, @relations) {
         my $meta = $class->related_to($rel);
         unless ($meta) {
             my $class_name = ref $class || $class;
-
-            my %all_rels;
-            my $hm = $class->has_many_relations // {};
-            for my $name (keys %$hm) {
-                $all_rels{$name} = 'has_many';
-            }
-            my $bt = $class->belongs_to_relations // {};
-            for my $name (keys %$bt) {
-                $all_rels{$name} = 'belongs_to';
-            }
+            my $all_rels = $class->all_relations;
 
             my $msg = "Invalid JOIN: '$class_name' has no"
                     . " relationship named '$rel'\n";
 
-            if (keys %all_rels) {
+            if (keys %$all_rels) {
                 $msg .= "Available relationships:\n";
-                for my $name (sort keys %all_rels) {
-                    $msg .= "  - $name ($all_rels{$name})\n";
+                for my $name (sort keys %$all_rels) {
+                    $msg .= "  - $name ($all_rels->{$name})\n";
                 }
             }
             else {

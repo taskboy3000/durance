@@ -135,6 +135,23 @@ sub related_to ($class, $name) {
         // $ORM::DSL::_belongs_to{$class_name}{$name};
 }
 
+sub all_relations ($class) {
+    # Unified accessor for all relationships (both has_many and belongs_to)
+    # Returns: { relationship_name => 'has_many'|'belongs_to', ... }
+    # NOTE: Hash key order is undefined; callers should use sort if consistent
+    #       ordering is needed (e.g., for error messages or deterministic SQL)
+    my %rels;
+    my $hm = $class->has_many_relations;
+    for my $name (keys %$hm) {
+        $rels{$name} = 'has_many';
+    }
+    my $bt = $class->belongs_to_relations;
+    for my $name (keys %$bt) {
+        $rels{$name} = 'belongs_to';
+    }
+    return \%rels;
+}
+
 sub find ( $class, $id ) {
     my $pk    = $class->primary_key;
     my $table = $class->table;

@@ -881,6 +881,19 @@ subtest 'ORM::Model - JOIN Support' => sub {
         is($related->{isa}, 'MyApp::Model::Employee', 'related_to returns correct meta');
     };
 
+    subtest 'JOIN-1b: all_relations unified accessor' => sub {
+        my $company_rels = MyApp::Model::Company->all_relations;
+        ok(exists $company_rels->{employees}, 'all_relations returns employees');
+        is($company_rels->{employees}, 'has_many', 'employees is has_many type');
+
+        my $employee_rels = MyApp::Model::Employee->all_relations;
+        ok(exists $employee_rels->{company}, 'all_relations returns company');
+        is($employee_rels->{company}, 'belongs_to', 'company is belongs_to type');
+
+        my $all = { %$company_rels, %$employee_rels };
+        ok(keys %$all >= 2, 'combined relations have multiple entries');
+    };
+
     subtest 'JOIN-2: add_joins method chains correctly' => sub {
         my $rs = MyApp::Model::Employee->where({});
         my $rs2 = $rs->add_joins('company');

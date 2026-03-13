@@ -65,6 +65,8 @@ ok 15 - ORM::Model - Basic attributes
 - `validations($name)` - Validation rules for a column
 - `schema_name` - Schema name extracted from package
 - `attributes` - Alias for columns
+- `all_relations` - Hash of all relationships (both has_many and belongs_to)
+  with types: `{ name => 'has_many'|'belongs_to', ... }`
 - `has_many_relations` - Hash of has_many relationship metadata
 - `belongs_to_relations` - Hash of belongs_to relationship metadata
 - `related_to($name)` - Relationship metadata for a named relation
@@ -387,9 +389,29 @@ developer experience and catch errors early.
 * Analyze how each Perl package meets the needs of the framework
 * Find where modules are not using a single responsibility principle
 * Revise t/orm.t to exercise all public methods (verify no gaps remain)
-* Extract relationship-gathering logic in ResultSet::add_joins into a shared
-  helper (e.g., ORM::Model->all_relations) to avoid duplication when new
-  relationship types like `has_one` are added
+
+### 10. Extract all_relations() for Code Reuse ✓ IN PROGRESS
+
+Unified relationship-gathering logic into `ORM::Model->all_relations()` to
+avoid duplication and prepare for additional relationship types like
+`has_one`.
+
+**Implementation:**
+- `all_relations()` already exists in ORM::Model (returns hash with relationship
+  names as keys and types as values: `{ name => 'has_many', ... }`)
+- Handles random hash key ordering by using `sort keys` in error messages
+  (ResultSet.pm:34)
+- Replaces scattered calls to `has_many_relations` and `belongs_to_relations`
+- Already used by ResultSet.pm for error reporting (line 27)
+- Test coverage updated to use `all_relations` instead of separate accessors
+
+**Design Decisions:**
+- Simpler format (no nested metadata) - callers don't need additional info
+- Hash structure works correctly despite random key ordering (sorted where needed)
+- Single method reduces future maintenance when adding new relationship types
+
+### Previously Completed Tasks
+
 * ✓ COMPLETED: ensure_schema_valid now suggests `sync_table($model)` for
   single-model failures, with `migrate_all` as a secondary option
 
