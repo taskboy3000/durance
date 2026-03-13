@@ -37,10 +37,13 @@ sub _db_class_for { return 'TestDB'; }
 
 package main;
 
-our $gDBName = './MyApp/var/test.db';
+our $gDBName = "$FindBin::Bin/MyApp/var/test.db";
 
 # Clean up test DB before running tests
-unlink $gDBName if -e $gDBName;
+if (-e $gDBName) {
+    print "Removing stale DB file: $gDBName\n";
+    unlink $gDBName or warn("unlink: $gDBName - $!\n");
+}
 
 sub create_test_db ($app) {
     if (-e $gDBName) {
@@ -332,6 +335,7 @@ subtest 'ORM::Model - CRUD operations' => sub {
         };
 
         subtest '4.3: Test find and all' => sub {
+
             my $alice = MyApp::Model::CrudFull->create({ name => 'Bob', email => 'bob@test.com' });
             MyApp::Model::CrudFull->create({ name => 'Carol', email => 'carol@test.com' });
 
