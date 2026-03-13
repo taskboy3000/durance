@@ -395,6 +395,29 @@ sub sync_table ( $self, $class_or_model ) {
     return \@changes;
 }
 
+sub schema_valid ( $self, $modelOrClass ) {
+    my $changes = $self->pending_changes($modelOrClass);
+    my $valid = (scalar @$changes == 0) ? 1 : 0;
+
+    return wantarray ? ($valid, $changes) : $valid;
+}
+
+sub ensure_schema_valid ( $self, $modelOrClass ) {
+    my ($valid, $changes) = $self->schema_valid($modelOrClass);
+    return 1 if $valid;
+
+    my $class = ref $modelOrClass || $modelOrClass;
+    my $app_name = (split /::/, $class)[0];
+
+    my $change_list = join "\n", map { "  - $_" } @$changes;
+
+    die "Schema validation failed for '$class':\n"
+      . "$change_list\n\n"
+      . "To fix this, run:\n"
+      . "  my \$schema = ORM::Schema->new(dbh => \$dbh);\n"
+      . "  \$schema->migrate_all('${app_name}::DB');\n";
+}
+
 sub pending_changes ( $self, $modelOrClass ) {
     my $class = ref $modelOrClass || $modelOrClass;
     my $model;
@@ -536,6 +559,57 @@ Find all the models in this namespace and migrate each one.  Good for initializi
     my $changes = $schema->sync_table('MyApp::Model::User');
 
 Creates or migrates a table to match the model definition.
+
+=head2 schema_valid
+
+    # Scalar context: boolean
+    if ($schema->schema_valid($model)) {
+        print "Schema is up to date\n";
+    }
+
+    # List context: boolean + arrayref of changes
+    my ($valid, $changes) = $schema->schema_valid($model);
+    unless ($valid) {
+        warn "Pending changes: $_\n" for @$changes;
+    }
+
+Checks whether the database schema matches the model definition.
+Does not modify the database.
+
+In scalar context, returns true (1) if schema is valid, false (0)
+otherwise.  In list context, returns C<($valid, \@pending_changes)>.
+
+Accepts a model instance or class name.
+
+=head2 ensure_schema_valid
+
+    $schema->ensure_schema_valid('MyApp::Model::User');
+
+Dies with a helpful error message if the schema does not match the
+model definition.  The error message includes:
+
+=over 4
+
+=item * What is wrong (missing table or missing columns)
+
+=item * A suggested migration command to fix it
+
+=back
+
+Returns 1 if the schema is valid.
+
+B<Recommended usage:> Call this at application startup to catch
+schema drift early.  This is especially useful for long-running
+web applications (Mojolicious, Catalyst, Dancer).  Avoid calling
+this per-request in CGI environments where startup cost matters.
+
+    # In a Mojolicious startup() method:
+    sub startup ($self) {
+        my $schema = ORM::Schema->new(dbh => $dbh);
+        $schema->ensure_schema_valid('MyApp::Model::User');
+        $schema->ensure_schema_valid('MyApp::Model::Post');
+        # ... rest of startup
+    }
 
 =head2 pending_changes
 

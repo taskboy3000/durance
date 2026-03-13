@@ -1086,6 +1086,217 @@ subtest 'ORM::Model - Validation functions' => sub {
     };
 };
 
+subtest 'ORM::Schema - Schema Validation' => sub {
+    my $db = TestDB->new;
+    my $dbh = $db->dbh;
+    my $schema = ORM::Schema->new(dbh => $dbh);
+
+    subtest 'SV-1: schema_valid returns true for valid schema' => sub {
+        package MyApp::Model::ValidSchema;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'valid_schema';
+        column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $model = MyApp::Model::ValidSchema->new(db => $db);
+        $schema->create_table($model);
+
+        my $valid = $schema->schema_valid($model);
+        is($valid, 1, 'schema_valid returns true in scalar context');
+
+        my ($v, $changes) = $schema->schema_valid($model);
+        is($v, 1, 'schema_valid returns true in list context');
+        is(scalar @$changes, 0, 'no pending changes');
+    };
+
+    subtest 'SV-2: schema_valid returns false for missing table' => sub {
+        package MyApp::Model::MissingTable;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'missing_table_sv';
+        column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $model = MyApp::Model::MissingTable->new(db => $db);
+
+        my $valid = $schema->schema_valid($model);
+        is($valid, 0, 'schema_valid returns false for missing table');
+
+        my ($v, $changes) = $schema->schema_valid($model);
+        is($v, 0, 'false in list context');
+        ok(scalar @$changes > 0, 'has pending changes');
+        like($changes->[0], qr/does not exist/,
+            'change describes missing table');
+    };
+
+    subtest 'SV-3: schema_valid returns false for missing columns' => sub {
+        package MyApp::Model::MissingCol;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'valid_schema';
+        column id    => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name  => (is => 'rw', isa => 'Str');
+        column phone => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $model = MyApp::Model::MissingCol->new(db => $db);
+
+        my ($valid, $changes) = $schema->schema_valid($model);
+        is($valid, 0, 'schema_valid returns false for missing column');
+        like($changes->[0], qr/ADD COLUMN phone/,
+            'change describes missing column');
+    };
+
+    subtest 'SV-4: ensure_schema_valid passes for valid schema' => sub {
+        my $model = MyApp::Model::ValidSchema->new(db => $db);
+        my $result = eval { $schema->ensure_schema_valid($model) };
+        ok(!$@, 'ensure_schema_valid does not die for valid schema');
+        is($result, 1, 'ensure_schema_valid returns 1');
+    };
+
+    subtest 'SV-5: ensure_schema_valid dies with helpful message' => sub {
+        my $model = MyApp::Model::MissingCol->new(db => $db);
+        my $died = dies { $schema->ensure_schema_valid($model) };
+        ok($died, 'ensure_schema_valid dies for invalid schema');
+        like($died, qr/Schema validation failed/,
+            'error includes validation failed header');
+        like($died, qr/ADD COLUMN phone/,
+            'error includes specific missing column');
+        like($died, qr/migrate_all/,
+            'error includes migration command suggestion');
+        like($died, qr/MyApp::DB/,
+            'error includes app DB class name');
+    };
+
+    subtest 'SV-6: ensure_schema_valid dies for missing table' => sub {
+        my $model = MyApp::Model::MissingTable->new(db => $db);
+        my $died = dies { $schema->ensure_schema_valid($model) };
+        ok($died, 'ensure_schema_valid dies for missing table');
+        like($died, qr/does not exist/,
+            'error mentions table does not exist');
+        like($died, qr/migrate_all/,
+            'error includes migration suggestion');
+    };
+};
+
+subtest 'ORM::ResultSet - JOIN Validation' => sub {
+    my $db = TestDB->new;
+    my $dbh = $db->dbh;
+
+    # Reuse Employee/Company models from earlier JOIN tests
+    subtest 'JV-1: Invalid string relationship dies immediately' => sub {
+        my $died = dies {
+            MyApp::Model::Employee->where({})
+                ->add_joins('nonexistent_rel')
+                ->all;
+        };
+        ok($died, 'add_joins dies for invalid relationship');
+        like($died, qr/Invalid JOIN/,
+            'error includes Invalid JOIN header');
+        like($died, qr/nonexistent_rel/,
+            'error includes the bad relationship name');
+    };
+
+    subtest 'JV-2: Error lists available relationships' => sub {
+        my $died = dies {
+            MyApp::Model::Employee->where({})
+                ->add_joins('bad_rel')
+                ->all;
+        };
+        like($died, qr/Available relationships/,
+            'error includes available relationships header');
+        like($died, qr/company/,
+            'error lists company relationship');
+        like($died, qr/belongs_to/,
+            'error shows relationship type');
+    };
+
+    subtest 'JV-3: Hash override skips validation' => sub {
+        # Only test that add_joins() itself doesn't die for hash refs.
+        # The SQL may fail at execution time, but that is expected --
+        # we are testing that validation is skipped for hash overrides.
+        my $rs = eval {
+            MyApp::Model::Employee->where({})
+                ->add_joins({
+                    custom_table => {
+                        type => 'LEFT',
+                        on   => 'custom_table.id = employees.id',
+                        table => 'companies',
+                    }
+                });
+        };
+        ok(!$@, 'hash override does not die during add_joins')
+            or diag("Unexpected error: $@");
+        ok($rs, 'returns a ResultSet object');
+    };
+
+    subtest 'JV-4: Valid string relationship still works' => sub {
+        my @emps = eval {
+            MyApp::Model::Employee->where({})
+                ->add_joins('company')
+                ->all;
+        };
+        ok(!$@, 'valid relationship does not die');
+        ok(scalar @emps > 0, 'returns results');
+    };
+
+    subtest 'JV-5: Model with no relationships gives clear error' => sub {
+        package MyApp::Model::Lonely;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'lonely';
+        column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $schema = ORM::Schema->new(dbh => $dbh);
+        my $model = MyApp::Model::Lonely->new(db => $db);
+        $schema->create_table($model);
+
+        my $died = dies {
+            MyApp::Model::Lonely->where({})
+                ->add_joins('anything')
+                ->all;
+        };
+        ok($died, 'dies for model with no relationships');
+        like($died, qr/no defined relationships/,
+            'error says no relationships defined');
+        like($died, qr/has_many or belongs_to/,
+            'error suggests how to define relationships');
+    };
+
+    subtest 'JV-6: Mixed valid string and hash override works' => sub {
+        my @emps = eval {
+            MyApp::Model::Employee->where({})
+                ->add_joins('company', {
+                    extra => {
+                        type => 'LEFT',
+                        on   => 'companies.id = employees.company_id',
+                        table => 'companies',
+                    }
+                })
+                ->all;
+        };
+        ok(!$@, 'mixed valid string + hash override works')
+            or diag("Unexpected error: $@");
+    };
+};
+
 subtest 'ORM::Model - Basic attributes' => sub {
     my $myApp = MyApp::DB->new();
     my @modelClass = ORM::Schema->get_all_models_for_app($myApp);

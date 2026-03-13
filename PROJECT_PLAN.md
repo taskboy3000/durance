@@ -11,7 +11,7 @@ an ActiveRecord-style ORM in Perl using Moo, with full CRUD operations,
 schema management, relationship support, SQL JOIN queries, validations,
 and auto-timestamps.
 
-**Test Suite:** 13 test suites, ALL PASSING
+**Test Suite:** 15 test suites, ALL PASSING
 
 ```
 ok 1 - ORM::DB - attributes and methods
@@ -26,8 +26,10 @@ ok 9 - ORM::Model - Complex ResultSet Queries
 ok 10 - ORM::Model - Relationship functions
 ok 11 - ORM::Model - JOIN Support
 ok 12 - ORM::Model - Validation functions
-ok 13 - ORM::Model - Basic attributes
-1..13
+ok 13 - ORM::Schema - Schema Validation
+ok 14 - ORM::ResultSet - JOIN Validation
+ok 15 - ORM::Model - Basic attributes
+1..15
 ```
 
 ---
@@ -113,6 +115,8 @@ ok 13 - ORM::Model - Basic attributes
 - `migrate($model)` - Add missing columns
 - `migrate_all($app)` - Migrate all models for an app
 - `sync_table($model)` - Create or migrate table
+- `schema_valid($model)` - Check if schema matches model (boolean or list)
+- `ensure_schema_valid($model)` - Die with helpful message if schema invalid
 - `pending_changes($model)` - Report schema differences
 - `get_all_models_for_app($app)` - Discover all model classes
 
@@ -181,6 +185,8 @@ $user->delete;
 | Relationships | 7 | has_many, belongs_to, query, create_* |
 | JOIN Support | 8 | Introspection, chaining, belongs_to/has_many JOINs, WHERE, overrides |
 | Validations | 18 | Format, length, Bool coercion, column_meta, schema_name |
+| Schema Validation | 16 | schema_valid, ensure_schema_valid, error messages |
+| JOIN Validation | 11 | Invalid rel dies, error suggestions, hash bypass, no-rel model |
 | Basic attributes | 2 | Model discovery via get_all_models_for_app |
 
 ---
@@ -304,6 +310,32 @@ joins.
 
 **Commit:** d498597
 
+### 9. Schema Validation & Error Handling ✓
+
+Added explicit schema validation methods and JOIN validation to improve
+developer experience and catch errors early.
+
+**Schema Validation (ORM::Schema):**
+- `schema_valid($model)` - Returns boolean (scalar) or
+  `($valid, \@changes)` (list context). Does not modify the database.
+- `ensure_schema_valid($model)` - Dies with actionable error message
+  including migration command suggestion if schema is invalid.
+- Recommended for app startup in long-running web frameworks
+  (Mojolicious, Catalyst, Dancer). Not recommended for CGI.
+
+**JOIN Validation (ORM::ResultSet):**
+- `add_joins()` now validates string relationship names immediately.
+  Invalid names die with error listing available relationships.
+- Hash ref overrides are not validated (trusted as explicit/advanced).
+- Models with no relationships get a clear error suggesting
+  `has_many` or `belongs_to`.
+
+**Tests:** 2 new test suites (27 assertions total):
+- Schema Validation: 6 subtests (valid schema, missing table, missing
+  columns, ensure_schema_valid pass/fail, error message content)
+- JOIN Validation: 6 subtests (invalid rel, error suggestions, hash
+  bypass, valid rel, no-rel model, mixed)
+
 ### 8. Bug Fixes Applied ✓
 
 | Bug | Root Cause | Fix |
@@ -367,7 +399,6 @@ joins.
 | `preload()` | Eager loading (2 queries, avoids N+1) | Medium |
 | `has_one()` | One-to-one relationship support | Medium |
 | COUNT with JOIN | Special handling for COUNT queries with JOINs | Medium |
-| Missing relationship error | `add_joins('nonexistent')` should warn or die | Low |
 
 ### Long Term
 
@@ -398,4 +429,5 @@ joins.
 | Complex ResultSet Tests | ✓ DONE | e8af6ad |
 | isDSNValid() Method | ✓ DONE | cdb2611 |
 | JOIN Support | ✓ DONE | d498597 |
-| Full Test Coverage | ✓ DONE | 13 test suites passing |
+| Schema Validation & JOIN Validation | ✓ DONE | schema_valid, ensure_schema_valid, add_joins validation |
+| Full Test Coverage | ✓ DONE | 15 test suites passing |

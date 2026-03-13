@@ -14,6 +14,48 @@ has 'offset_val' => (is => 'rw');
 has 'join_specs' => (is => 'rw', default => sub { [] });
 
 sub add_joins ($self, @relations) {
+    my $class = $self->class;
+
+    for my $rel (@relations) {
+        # Only validate string relationship names.
+        # Hash refs are explicit overrides -- trust the user.
+        next if ref $rel;
+
+        my $meta = $class->related_to($rel);
+        unless ($meta) {
+            my $class_name = ref $class || $class;
+
+            my %all_rels;
+            my $hm = $class->has_many_relations // {};
+            for my $name (keys %$hm) {
+                $all_rels{$name} = 'has_many';
+            }
+            my $bt = $class->belongs_to_relations // {};
+            for my $name (keys %$bt) {
+                $all_rels{$name} = 'belongs_to';
+            }
+
+            my $msg = "Invalid JOIN: '$class_name' has no"
+                    . " relationship named '$rel'\n";
+
+            if (keys %all_rels) {
+                $msg .= "Available relationships:\n";
+                for my $name (sort keys %all_rels) {
+                    $msg .= "  - $name ($all_rels{$name})\n";
+                }
+            }
+            else {
+                $msg .= "$class_name has no defined"
+                       . " relationships.\n"
+                       . "Define relationships with"
+                       . " has_many or belongs_to"
+                       . " in your model.\n";
+            }
+
+            die $msg;
+        }
+    }
+
     push @{$self->join_specs}, @relations;
     return $self;
 }
@@ -286,19 +328,41 @@ Add OFFSET clause. Note: Most databases require LIMIT when using OFFSET.
 
     my $rs = $rs->add_joins('company');
     my $rs = $rs->add_joins('company', 'department');
-    my $rs = $rs->add_joins({ company => { type => 'INNER', on => 'companies.id = employees.company_id' } });
+    my $rs = $rs->add_joins({ company => {
+        type => 'INNER',
+        on   => 'companies.id = employees.company_id',
+    }});
 
-Add SQL JOIN clauses to the query. Supports:
+Add SQL JOIN clauses to the query. Supports two forms:
 
 =over 4
 
-=item * String API: Relationship names that match defined has_many or belongs_to relationships
+=item * B<String API> - Relationship names that match defined
+C<has_many> or C<belongs_to> relationships.  If the name does not
+match any known relationship, C<add_joins> will C<die> immediately
+with an error listing the available relationships.
 
-=item * Hash API: Explicit override with custom JOIN type and ON clause
+=item * B<Hash API> - Explicit override with custom JOIN type and
+ON clause.  Hash refs are B<not validated> against the model's
+relationships, so you can join arbitrary tables this way.
 
 =back
 
-Returns $self for method chaining.
+Returns C<$self> for method chaining.
+
+B<Error behavior (string API only):>
+
+    # Dies immediately:
+    MyApp::Model::User->where({})
+        ->add_joins('nonexistent')
+        ->all;
+
+    # Error message:
+    # Invalid JOIN: 'MyApp::Model::User' has no
+    #   relationship named 'nonexistent'
+    # Available relationships:
+    #   - posts (has_many)
+    #   - company (belongs_to)
 
 =head2 all
 
