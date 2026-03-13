@@ -567,6 +567,66 @@ subtest 'ORM::Model - Validation functions' => sub {
         my $fresh = MyApp::Model::BoolTest->new;
         is($fresh->enabled, 1, 'Bool default 1 returned');
     };
+
+    subtest 'column_meta method' => sub {
+        package MyApp::Model::MetaTest;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'meta_test';
+        column id         => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name       => (is => 'rw', isa => 'Str', required => 1);
+        column email      => (is => 'rw', isa => 'Str', length => 255);
+        column active     => (is => 'rw', isa => 'Bool', default => 1);
+
+        package main;
+
+        my $id_meta = MyApp::Model::MetaTest->column_meta('id');
+        is($id_meta->{primary_key}, 1, 'id is primary key');
+        is($id_meta->{isa}, 'Int', 'id isa Int');
+
+        my $name_meta = MyApp::Model::MetaTest->column_meta('name');
+        is($name_meta->{isa}, 'Str', 'name isa Str');
+        is($name_meta->{required}, 1, 'name is required');
+
+        my $email_meta = MyApp::Model::MetaTest->column_meta('email');
+        is($email_meta->{length}, 255, 'email has length 255');
+
+        my $active_meta = MyApp::Model::MetaTest->column_meta('active');
+        is($active_meta->{isa}, 'Bool', 'active isa Bool');
+        is($active_meta->{default}, 1, 'active has default 1');
+
+        my $missing_meta = MyApp::Model::MetaTest->column_meta('nonexistent');
+        is(keys %$missing_meta, 0, 'returns empty hash for missing column');
+    };
+
+    subtest 'schema_name method' => sub {
+        package MyApp::Model::SchemaTest;
+        use Moo;
+        extends 'ORM::Model';
+        use ORM::DSL;
+
+        tablename 'schema_test';
+        column id => (is => 'rw', isa => 'Int', primary_key => 1);
+
+        package main;
+
+        is(MyApp::Model::SchemaTest->schema_name, undef, 'plain model returns undef');
+
+        # Test with app:: schema
+        package MyApp::Model::app::User;
+        use Moo;
+        extends 'ORM::Model';
+        use ORM::DSL;
+
+        tablename 'app_users';
+        column id => (is => 'rw', isa => 'Int', primary_key => 1);
+
+        package main;
+
+        is(MyApp::Model::app::User->schema_name, 'app', 'extracts app schema');
+    };
 };
 
 subtest 'ORM::Model - Basic attributes' => sub {
