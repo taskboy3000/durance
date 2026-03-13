@@ -179,7 +179,7 @@ sub ddl_for_class ( $self, $class_name, $driver = undef ) {
 sub create_table ( $self, $model ) {
     my $class = ref $model;
     my $table = $model->table;
-    my $dbh   = $model->dbh // die 'No database handle for model ' . $class;
+    my $dbh   = $model->db->dbh // die 'No database handle for model ' . $class;
 
     if ( $self->table_exists($table) ) {
         return $self->migrate($model);
@@ -195,7 +195,7 @@ sub create_table ( $self, $model ) {
 
 sub table_exists ( $self, $model ) {
     my $table = $model->table;
-    my $dbh = $model->dbh // die 'No database handle';
+    my $dbh = $model->db->dbh // die 'No database handle';
 
     my $sth  = $dbh->table_info( undef, undef, $table, undef );
     my @info = $sth->fetchrow_array;
@@ -206,7 +206,7 @@ sub table_exists ( $self, $model ) {
 
 sub column_info ( $self, $model, $column ) {
     my $table = $model->table;
-    my $dbh = $model->dbh // die 'No database handle for model ' , ref $model;
+    my $dbh = $model->db->dbh // die 'No database handle for model ' , ref $model;
 
     my $sth = $dbh->column_info( undef, undef, $table, $column );
     return undef unless $sth;
@@ -219,7 +219,7 @@ sub column_info ( $self, $model, $column ) {
 
 sub table_info ( $self, $model ) {
     my $table = $model->table;
-    my $dbh = $model->dbh // die 'No database handle for ' . ref $model;
+    my $dbh = $model->db->dbh // die 'No database handle for ' . ref $model;
 
     my $sth = $dbh->column_info( undef, undef, $table, '%' );
     return () unless $sth;
@@ -328,7 +328,7 @@ sub migrate_all ($self, $modelOrClass) {
 sub migrate ( $self, $model) {
     my $class = ref $model;
     my $table = $model->table;
-    my $dbh   = $model->dbh // die 'No database handle';
+    my $dbh   = $model->db->dbh // die 'No database handle';
 
     my $driver = $self->_detect_driver($dbh); # Is this needed?
 
@@ -399,7 +399,7 @@ sub pending_changes ( $self, $modelOrClass ) {
     }
 
     my $table = $model->table;
-    my $dbh   = $model->dbh;
+    my $dbh   = $model->db->dbh;
 
     my @pending;
 

@@ -17,6 +17,14 @@ use Test2::V0;
 use MyApp::DB;
 use ORM::Schema;
 
+# Test database class - defined once for all tests
+package TestDB;
+use Moo;
+extends 'ORM::DB';
+sub _build_dsn { 'dbi:SQLite:dbname=:memory:' }
+
+package main;
+
 our $gDBName = './MyApp/var/test.db';
 
 sub create_test_db ($app) {
@@ -27,14 +35,6 @@ sub create_test_db ($app) {
 }
 
 subtest 'ORM::DB - attributes and methods' => sub {
-    package TestDB;
-    use Moo;
-    extends 'ORM::DB';
-
-    sub _build_dsn { 'dbi:SQLite:dbname=:memory:' }
-
-    package main;
-
     my $db = TestDB->new;
 
     subtest 'attributes' => sub {
@@ -76,6 +76,129 @@ subtest 'ORM::DB - attributes and methods' => sub {
     };
 
     package main;
+};
+
+subtest 'ORM::Schema - constructor and attributes' => sub {
+    my $db = TestDB->new;
+    my $dbh = $db->dbh;
+
+    my $schema = ORM::Schema->new(dbh => $dbh);
+
+    ok($schema, 'Schema object created');
+    is($schema->dbh, $dbh, 'dbh attribute set correctly');
+
+    my $driver = $schema->_detect_driver($dbh);
+    is($driver, 'sqlite', 'driver auto-detected as sqlite');
+
+    subtest 'driver override' => sub {
+        my $schema_mysql = ORM::Schema->new(dbh => $dbh, driver => 'mysql');
+        is($schema_mysql->driver, 'mysql', 'driver can be overridden');
+    };
+
+    ok($schema->logger, 'logger attribute exists');
+};
+
+subtest 'ORM::Schema - DDL generation' => sub {
+    package MyApp::Model::TestItem;
+    use Moo;
+    extends 'ORM::Model';
+    use ORM::DSL;
+
+    tablename 'test_items';
+    column id    => (is => 'rw', isa => 'Int', primary_key => 1);
+    column name  => (is => 'rw', isa => 'Str', required => 1);
+    column email => (is => 'rw', isa => 'Str');
+    column age   => (is => 'rw', isa => 'Int');
+
+    package main;
+
+    my $db = TestDB->new;
+    my $dbh = $db->dbh;
+    my $schema = ORM::Schema->new(dbh => $dbh, driver => 'sqlite');
+
+    subtest 'ddl_for_class generates valid SQL' => sub {
+        my $sql = $schema->ddl_for_class('MyApp::Model::TestItem', 'sqlite');
+
+        like($sql, qr/CREATE TABLE test_items/, 'contains CREATE TABLE');
+        like($sql, qr/id INTEGER PRIMARY KEY AUTOINCREMENT/, 'id is INTEGER PRIMARY KEY AUTOINCREMENT');
+        like($sql, qr/name TEXT NOT NULL/, 'name is TEXT NOT NULL');
+        like($sql, qr/email TEXT/, 'email is TEXT');
+        like($sql, qr/age INTEGER/, 'age is INTEGER');
+        unlike($sql, qr/VARCHAR/, 'no VARCHAR for SQLite');
+    };
+
+    subtest 'ddl_for_class with MySQL driver' => sub {
+        my $sql = $schema->ddl_for_class('MyApp::Model::TestItem', 'mysql');
+
+        like($sql, qr/CREATE TABLE test_items/, 'contains CREATE TABLE');
+        like($sql, qr/id INTEGER PRIMARY KEY AUTO_INCREMENT/, 'id uses AUTO_INCREMENT');
+        like($sql, qr/name VARCHAR\(255\) NOT NULL/, 'name is VARCHAR(255) NOT NULL');
+        like($sql, qr/email VARCHAR\(255\)/, 'email is VARCHAR(255)');
+        like($sql, qr/age INTEGER/, 'age is INTEGER');
+        unlike($sql, qr/AUTOINCREMENT/, 'no SQLite AUTOINCREMENT');
+    };
+
+    subtest 'type mapping for SQLite' => sub {
+        package MyApp::Model::Types;
+        use Moo;
+        extends 'ORM::Model';
+        use ORM::DSL;
+
+        tablename 'types';
+        column id          => (is => 'rw', isa => 'Int', primary_key => 1);
+        column str_col     => (is => 'rw', isa => 'Str');
+        column text_col    => (is => 'rw', isa => 'Text');
+        column bool_col    => (is => 'rw', isa => 'Bool');
+        column float_col   => (is => 'rw', isa => 'Float');
+        column timestamp_col => (is => 'rw', isa => 'Timestamp');
+
+        package main;
+
+        my $sql = $schema->ddl_for_class('MyApp::Model::Types', 'sqlite');
+
+        like($sql, qr/str_col TEXT/, 'Str maps to TEXT');
+        like($sql, qr/text_col TEXT/, 'Text maps to TEXT');
+        like($sql, qr/bool_col INTEGER/, 'Bool maps to INTEGER');
+        like($sql, qr/float_col REAL/, 'Float maps to REAL');
+        like($sql, qr/timestamp_col TEXT/, 'Timestamp maps to TEXT');
+    };
+};
+
+subtest 'ORM::Schema - table introspection' => sub {
+    my $db = TestDB->new;
+    my $dbh = $db->dbh;
+    my $schema = ORM::Schema->new(dbh => $dbh);
+
+    subtest 'table_exists returns false for non-existent table' => sub {
+        package MyApp::Model::NonExistent;
+        use Moo;
+        extends 'ORM::Model';
+        use ORM::DSL;
+
+        tablename 'nonexistent_table';
+        column id => (is => 'rw', isa => 'Int', primary_key => 1);
+
+        package main;
+
+        my $model = MyApp::Model::NonExistent->new(db => $db);
+        ok(!$schema->table_exists($model), 'table_exists returns false');
+    };
+
+    subtest 'table_info returns empty for non-existent table' => sub {
+        package MyApp::Model::NonExistent2;
+        use Moo;
+        extends 'ORM::Model';
+        use ORM::DSL;
+
+        tablename 'another_nonexistent';
+        column id => (is => 'rw', isa => 'Int', primary_key => 1);
+
+        package main;
+
+        my $model = MyApp::Model::NonExistent2->new(db => $db);
+        my @cols = $schema->table_info($model);
+        is(scalar @cols, 0, 'table_info returns empty list');
+    };
 };
 
 subtest 'ORM::Model - Basic attributes' => sub {

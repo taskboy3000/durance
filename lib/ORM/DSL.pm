@@ -62,8 +62,12 @@ sub load_into {
         my %opts = @opts;
         my $pkg  = $caller;
 
+        # Store in both the package-specific hash AND ORM::Model for attribute lookup
         ${$caller . "::_columns"}->{$pkg} //= [];
         push @{ ${$caller . "::_columns"}->{$pkg} }, $name;
+        
+        $ORM::Model::_columns{$pkg} //= [];
+        push @{$ORM::Model::_columns{$pkg}}, $name;
 
         # This is interesting in that it is a global registry 
         # of all columns defined in all the model packages
