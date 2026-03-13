@@ -51,8 +51,6 @@ sub db {
     return $class->_db;
 }
 
-sub _db_class_for;  # forward declaration
-
 sub _db {
     my $class = shift;
     my $pkg = ref $class || $class;
