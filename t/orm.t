@@ -412,6 +412,85 @@ subtest 'ORM::Model - CRUD operations' => sub {
     };
 };
 
+subtest 'ORM::Model - Error handling' => sub {
+    my $db = TestDB->new;
+    my $dbh = $db->dbh;
+    my $schema = ORM::Schema->new(dbh => $dbh);
+
+    subtest 'EH-1: find() returns undef when record not found' => sub {
+        package MyApp::Model::ErrorFind;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'error_find';
+        column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $model = MyApp::Model::ErrorFind->new(db => $db);
+        $schema->create_table($model);
+
+        my $found = MyApp::Model::ErrorFind->find(999);
+        ok(!defined $found, 'find returns undef for non-existent record');
+    };
+
+    subtest 'EH-2: update() without primary key throws' => sub {
+        package MyApp::Model::ErrorUpdate;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'error_update';
+        column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $obj = MyApp::Model::ErrorUpdate->new(name => 'Test');
+        eval { $obj->update };
+        ok($@ && $@ =~ /primary key/, 'update without pk dies');
+    };
+
+    subtest 'EH-3: delete() without primary key throws' => sub {
+        package MyApp::Model::ErrorDelete;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'error_delete';
+        column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $obj = MyApp::Model::ErrorDelete->new(name => 'Test');
+        eval { $obj->delete };
+        ok($@ && $@ =~ /primary key/, 'delete without pk dies');
+    };
+
+    subtest 'EH-4: db() with invalid DSN throws' => sub {
+        package MyApp::Model::BadDSN;
+        use Moo;
+        extends 'ORM::Model';
+
+        sub _db_class_for { 'BadTestDB' }
+
+        package BadTestDB;
+        use Moo;
+        extends 'ORM::DB';
+
+        sub _build_dsn { 'dbi:SQLite:dbname=/nonexistent/path/test.db' }
+
+        package main;
+
+        my $db = MyApp::Model::BadDSN->db;
+        eval { $db->dbh };
+        ok($@, 'dbh() dies with invalid DSN');
+    };
+};
+
 subtest 'ORM::Model - Relationship functions' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
