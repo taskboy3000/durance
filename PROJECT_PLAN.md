@@ -1178,7 +1178,7 @@ Add tests for error conditions and edge cases.
 
 ---
 
-## Test Coverage: Auto-Timestamps
+## Test Coverage: Auto-Timestamps ✓ COMPLETED
 
 ### Goal
 Test that created_at and updated_at are automatically populated.
@@ -1205,8 +1205,8 @@ Test that created_at and updated_at are automatically populated.
 - Call create() and update()
 - Assert no errors (silently skipped)
 
-### Files to Modify
-- `t/orm.t` - Add timestamp tests
+### Files Modified
+- `t/orm.t` - Added timestamp tests
 
 ---
 

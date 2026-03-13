@@ -502,6 +502,86 @@ subtest 'ORM::Model - Error handling' => sub {
     };
 };
 
+subtest 'ORM::Model - Auto-timestamps' => sub {
+    my $db = TestDB->new;
+    my $dbh = $db->dbh;
+    my $schema = ORM::Schema->new(dbh => $dbh);
+
+    subtest 'AT-1 & AT-2: create() sets created_at and updated_at' => sub {
+        package MyApp::Model::TimestampTest;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'timestamp_test';
+        column id         => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name       => (is => 'rw', isa => 'Str');
+        column created_at => (is => 'rw', isa => 'Str');
+        column updated_at => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $model = MyApp::Model::TimestampTest->new(db => $db);
+        $schema->create_table($model);
+
+        my $obj = MyApp::Model::TimestampTest->create({ name => 'Test' });
+
+        ok($obj->created_at, 'created_at is set after create');
+        ok($obj->updated_at, 'updated_at is set after create');
+    };
+
+    subtest 'AT-3: update() sets updated_at' => sub {
+        package MyApp::Model::TimestampUpdate;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'timestamp_update';
+        column id         => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name       => (is => 'rw', isa => 'Str');
+        column created_at => (is => 'rw', isa => 'Str');
+        column updated_at => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $model = MyApp::Model::TimestampUpdate->new(db => $db);
+        $schema->create_table($model);
+
+        my $obj = MyApp::Model::TimestampUpdate->create({ name => 'Test' });
+        my $original_updated = $obj->updated_at;
+
+        sleep(1);
+
+        $obj->name('Updated');
+        $obj->update;
+
+        ok($obj->updated_at gt $original_updated, 'updated_at changed after update');
+    };
+
+    subtest 'AT-4: timestamps work without columns' => sub {
+        package MyApp::Model::NoTimestamp;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'no_timestamp';
+        column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $model = MyApp::Model::NoTimestamp->new(db => $db);
+        $schema->create_table($model);
+
+        my $obj = MyApp::Model::NoTimestamp->create({ name => 'Test' });
+        ok($obj->id, 'create works without timestamp columns');
+
+        $obj->name('Updated');
+        $obj->update;
+        ok($obj->name eq 'Updated', 'update works without timestamp columns');
+    };
+};
+
 subtest 'ORM::Model - Relationship functions' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
