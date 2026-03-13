@@ -21,19 +21,19 @@ use ORM::Schema;
 package TestDB;
 use Moo;
 extends 'ORM::DB';
-sub _build_dsn { 'dbi:SQLite:dbname=:memory:' }
-sub disconnect_all { }  # Override to avoid clearing in-memory DB
+use File::Temp qw(tempfile);
+
+sub _build_dsn { 
+    my ($tf) = tempfile(TEMPLATE => 'orm_test_XXXX', SUFFIX => '.db', DIR => '/tmp');
+    return "dbi:SQLite:dbname=$tf";
+}
 
 # Base model class for test models that use TestDB
 package TestModel;
 use Moo;
 extends 'ORM::Model';
 
-our $TEST_DB;
-
-sub _db {
-    return $TEST_DB // die "TestDB not set";
-}
+sub _db_class_for { return 'TestDB'; }
 
 package main;
 
@@ -50,7 +50,7 @@ subtest 'ORM::DB - attributes and methods' => sub {
     my $db = TestDB->new;
 
     subtest 'attributes' => sub {
-        is($db->dsn, 'dbi:SQLite:dbname=:memory:', 'dsn returns correct DSN');
+        like($db->dsn, qr/dbi:SQLite:dbname=.*\.db/, 'dsn returns correct DSN');
 
         is($db->username, undef, 'username defaults to undef');
         is($db->password, undef, 'password defaults to undef');

@@ -28,7 +28,7 @@ sub db {
 sub _db {
     my $class = shift;
     my $pkg = ref $class || $class;
-    my $db_class = _db_class_for($pkg);
+    my $db_class = $pkg->_db_class_for($pkg);
     eval "require $db_class";
     die "Cannot load DB class $db_class: $@" if $@;
     return $db_class->new;

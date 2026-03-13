@@ -3,6 +3,6 @@ package MyApp::DB;
 use base 'ORM::DB';
 use FindBin;
 
-sub _build_dsn {"dbi:SQLite2:dbname=$FindBin::Bin/var/test.db"};
+sub _build_dsn {"dbi:SQLite:dbname=$FindBin::Bin/var/test.db"};
 
 1;
