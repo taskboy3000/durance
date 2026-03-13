@@ -2,32 +2,38 @@
 package ORM::Model;
 use strict;
 use warnings;
+use experimental 'signatures';
+
 use Carp qw(croak);
-use Mojo::Base '-base', '-signatures';
+use Moo;
 
 our %COLUMN_META;
-our ( %_columns, %_primary_key, %_tablename, 
+our ( %_columns, %_primary_key, 
       %_has_many, %_belongs_to, %_validations );
 
-has primaryKey => 'id';
 
-sub db_class {
-    my ($self, $val) = @_;
-    my $is_class = !ref($self);
+has primaryKey => (is => 'lazy');
+sub _build_primaryKey {'id'};
+
+
+sub import {
+    # Do nothing - users should explicitly use ORM::DSL
+}
+
+has db => (
+    is      => 'lazy',
+    builder => '_build_db',
+);
+
+sub _build_db {
+    my ($self) = @_;
+    my $pkg = ref($self) || $self;
     
-    if (defined $val) {
-        no strict 'refs';
-        ${"$self\::db_class"} = $val;
-        return $self;
-    }
+    my $db_class = _db_class_for($pkg);
+    eval "require $db_class";
+    croak "Cannot load DB class $db_class: $@" if $@;
     
-    if (!$is_class && exists $self->{db_class} && defined $self->{db_class}) {
-        return $self->{db_class};
-    }
-    
-    my $pkg = $is_class ? $self : ref($self);
-    no strict 'refs';
-    return ${"$pkg\::db_class"};
+    return $db_class->new;
 }
 
 sub _db_class_for ($class) {
@@ -48,163 +54,17 @@ sub schema_name ($class) {
     return undef;
 }
 
-sub import {
-    my ($class) = @_;
-    my $caller = caller;
-
-    no strict 'refs';
-
-    *{"${caller}::column"} = sub {
-        my ( $name, @opts ) = @_;
-        my %opts = @opts;
-        my $pkg  = caller;
-
-        $ORM::Model::_columns{$pkg} //= [];
-        push @{ $ORM::Model::_columns{$pkg} }, $name;
-
-        $ORM::Model::COLUMN_META{$pkg}{$name} = \%opts;
-
-        if ( $opts{primary_key} ) {
-            $ORM::Model::_primary_key{$pkg} = $name;
-        }
-
-        my $is = $opts{is} // 'rw';
-        my $validations = $ORM::Model::_validations{$pkg}{$name} // {};
-        my $col_isa     = lc($opts{isa} // '');
-        my $col_length  = $opts{length};
-        my $is_bool     = ($col_isa eq 'bool') ? 1 : 0;
-
-        if ( $is eq 'rw' ) {
-            *{"${pkg}::${name}"} = sub {
-                my ( $self, $val ) = @_;
-                if ( defined $val ) {
-                    if (exists $validations->{required}
-                        && $validations->{required} && !defined $val)
-                    {
-                        croak "$name is required";
-                    }
-                    if (exists $validations->{format} && defined $val) {
-                        unless ($val =~ $validations->{format}) {
-                            croak "Invalid $name: $val";
-                        }
-                    }
-                    if ($is_bool) {
-                        $val = $val ? 1 : 0;
-                    }
-                    if (defined $col_length && length($val) > $col_length) {
-                        croak "$name exceeds maximum length of $col_length";
-                    }
-                    $self->{$name} = $val;
-                    return $self;
-                }
-                if ($is_bool && !exists $self->{$name}
-                    && defined $opts{default})
-                {
-                    return $opts{default} ? 1 : 0;
-                }
-                return $self->{$name};
-            };
-        }
-        else {
-            *{"${pkg}::${name}"} = sub {
-                my ($self) = @_;
-                return $self->{$name};
-            };
-        }
-
-        return;
-    };
-
-    *{"${caller}::tablename"} = sub ($name) {
-        my $pkg = caller;
-        $_tablename{$pkg} = $name;
-        return;
-    };
-
-    *{"${caller}::has_many"} = sub ($name, %opts) {
-        my $pkg = caller;
-        $_has_many{$pkg}{$name} = \%opts;
-        
-        my $isa = $opts{isa};
-        my $foreign_key = $opts{foreign_key};
-        
-        unless ($foreign_key) {
-            $foreign_key = "${name}_id";
-        }
-        
-        *{"${pkg}::${name}"} = sub ($self) {
-            my $model_class = $isa;
-            my $fk = $foreign_key;
-            my $pk = $self->primary_key;
-            my $pk_val = $self->$pk;
-            
-            return () unless defined $pk_val;
-            
-            my $result = $model_class->where({ $fk => $pk_val });
-            return wantarray ? @$result : $result;
-        };
-        
-        my $create_method = "create_$name";
-        *{"${pkg}::$create_method"} = sub ($self, @args) {
-            my $model_class = $isa;
-            my $pk = $self->primary_key;
-            my $pk_val = $self->$pk;
-            
-            return croak "Cannot create related object without primary key" unless defined $pk_val;
-            
-            my %data = (@args, $foreign_key => $pk_val);
-            return $model_class->create(\%data);
-        };
-        
-        return;
-    };
-
-    *{"${caller}::belongs_to"} = sub ($name, %opts) {
-        my $pkg = caller;
-        $_belongs_to{$pkg}{$name} = \%opts;
-        
-        my $isa = $opts{isa};
-        my $foreign_key = $opts{foreign_key} // "${name}_id";
-        
-        *{"${pkg}::${name}"} = sub ($self) {
-            my $model_class = $isa;
-            my $fk = $foreign_key;
-            my $fk_val = $self->$fk;
-            
-            return undef unless defined $fk_val;
-            
-            return $model_class->find($fk_val);
-        };
-        
-        return;
-    };
-
-    *{"${caller}::validates"} = sub ($name, %opts) {
-        my $pkg = caller;
-        $_validations{$pkg}{$name} = \%opts;
-        return;
-    };
-}
-
 sub table ($self) {
     my $callerPkg = ref $self || $self;
-    
-    if (exists $_tablename{$callerPkg}) {
-        return $_tablename{$callerPkg};
+
+    no strict 'refs';
+    my $tableName = ${"${callerPkg}::_tablename"}; 
+    if (defined $tableName) {
+        return $tableName;
     }
-    
-    my ($tableName) = ($callerPkg =~ /::([^:]+)$/);
-    $tableName = lc $tableName;
-    
-    my ($namespace) = ($callerPkg =~ /^(.+?)::[^:]+$/);
-    if ($namespace) {
-        $namespace = lc $namespace;
-        $namespace =~ s/::/_/g;
-        $tableName = "${namespace}_${tableName}";
-    }
-    
-    $tableName .= 's' unless $tableName =~ /s$/;
-    return $tableName;
+    use strict;
+
+    croak("assert - tablename not set");
 };
 
 sub column_meta ( $class, $column ) {
@@ -219,14 +79,6 @@ sub primary_key ($class) {
     return $_primary_key{$class} // 'id';
 }
 
-sub has_many ($class, $name) {
-    return $_has_many{$class}{$name} // {};
-}
-
-sub belongs_to ($class, $name) {
-    return $_belongs_to{$class}{$name} // {};
-}
-
 sub validations ($class, $name) {
     return $_validations{$class}{$name} // {};
 }
@@ -236,87 +88,10 @@ sub attributes {
     return $_columns{$class} // [];
 }
 
-sub dbh {
-    my ($self, $val) = @_;
-    my $is_class = !ref($self);
-    
-    if (defined $val) {
-        if ($is_class) {
-            no strict 'refs';
-            ${"$self\::dbh"} = $val;
-            return $self;
-        }
-        $self->{dbh} = $val;
-        return $self;
-    }
-    
-    if (!$is_class && exists $self->{dbh} && defined $self->{dbh}) {
-        return $self->{dbh};
-    }
-    
-    my $pkg = $is_class ? $self : ref($self);
-    
-    my $dbh = _find_dbh($pkg);
-    return $dbh if $dbh;
-    
-    my $db_class;
-    if (!$is_class && exists $self->{db_class} && defined $self->{db_class}) {
-        $db_class = $self->{db_class};
-    }
-    else {
-        no strict 'refs';
-        $db_class = ${"$pkg\::db_class"};
-    }
-    $db_class //= _db_class_for($pkg);
-    
-    my $loaded;
-    {
-        no strict 'refs';
-        $loaded = %{"${db_class}::"} > 0 || @{"${db_class}::ISA"} > 0;
-    }
-    
-    if (!$loaded) {
-        eval "require $db_class";
-        croak "Cannot load DB class $db_class: $@" if $@;
-    }
-    
-    if ($db_class->can('dbh')) {
-        return $db_class->dbh;
-    }
-    
-    croak "No database handle available. Set dbh on the class or instance.";
-}
-
-sub _find_dbh {
-    my ($pkg) = @_;
-    
-    {
-        no strict 'refs';
-        my $class_dbh = ${"$pkg\::dbh"};
-        if (defined $class_dbh) {
-            eval { 
-                local $SIG{__WARN__} = sub {}; 
-                $class_dbh->prepare('SELECT 1') 
-            };
-            if (!$@) {
-                return $class_dbh;
-            }
-        }
-        
-        for my $parent (@{"${pkg}::ISA"}) {
-            if (my $parent_dbh = _find_dbh($parent)) {
-                return $parent_dbh;
-            }
-        }
-    }
-    
-    return undef;
-}
-
 sub find ( $class, $id ) {
     my $pk    = $class->primary_key;
     my $table = $class->table;
-    my $dbh   = $class->dbh // croak 'No database handle';
+    my $dbh   = $class->db->dbh;
 
     my $stmt = "SELECT * FROM $table WHERE $pk = ?";
     my $sth  = $dbh->prepare($stmt);
@@ -327,12 +102,12 @@ sub find ( $class, $id ) {
 
     return undef unless $row;
 
-    return $class->new(%$row, dbh => $dbh);
+    return $class->new(%$row, db => $class->db);
 }
 
 sub all ($class) {
     my $table = $class->table;
-    my $dbh   = $class->dbh // croak 'No database handle';
+    my $dbh   = $class->db->dbh;
 
     my $stmt = "SELECT * FROM $table";
     my $sth  = $dbh->prepare($stmt);
@@ -341,7 +116,7 @@ sub all ($class) {
     my @rows;
     while ( my $row = $sth->fetchrow_hashref ) {
         push @rows,
-          $class->new( %$row, dbh => $dbh );
+          $class->new( %$row, db => $class->db );
     }
     $sth->finish;
 
@@ -361,8 +136,9 @@ sub where ( $class, $conditions = {} ) {
     return wantarray ? $rs->all : $rs;
 }
 
+# Mented to a called as a class method
 sub create ( $class, $data ) {
-    my $dbh = $class->dbh // croak 'No database handle';
+    my $dbh = $class->db->dbh;
 
     my $now = scalar localtime;
     if ($class->can('columns')) {
@@ -375,7 +151,7 @@ sub create ( $class, $data ) {
         }
     }
 
-    return $class->new( %$data, dbh => $dbh )->insert;
+    return $class->new( %$data, db => $class->db )->insert;
 }
 
 sub _columns_info ($class) {
@@ -384,10 +160,10 @@ sub _columns_info ($class) {
 
 sub insert ($self) {
     my $table = ref($self)->table;
-    my $dbh   = $self->dbh // croak 'No database handle';
+    my $dbh   = $self->db->dbh;
 
     my @cols =
-      grep { defined $self->{$_} && $_ ne 'dbh' }
+      grep { defined $self->{$_} && $_ ne 'db' }
       keys %$self;
     return $self unless @cols;
 
@@ -411,7 +187,7 @@ sub insert ($self) {
 
 sub update ($self) {
     my $table = ref($self)->table;
-    my $dbh   = $self->dbh // croak 'No database handle';
+    my $dbh   = $self->db->dbh;
 
     my $pk      = ref($self)->primary_key;
     my $pk_val = $self->{$pk} // croak "Cannot update without primary key value";
@@ -427,7 +203,7 @@ sub update ($self) {
     my @cols =
       grep {
              defined $self->{$_}
-          && $_ ne 'dbh'
+          && $_ ne 'db'
           && $_ ne $pk
       }
       keys %$self;
@@ -446,7 +222,7 @@ sub update ($self) {
 
 sub delete ($self) {
     my $table = ref($self)->table;
-    my $dbh   = $self->dbh // croak 'No database handle';
+    my $dbh   = $self->db->dbh;
 
     my $pk      = ref($self)->primary_key;
     my $pk_val = $self->{$pk} // croak "Cannot delete without primary key value";
@@ -471,7 +247,7 @@ sub save ($self) {
 
 sub to_hash ($self) {
     my %hash = %$self;
-    delete $hash{dbh};
+    delete $hash{db};
     delete $hash{$_} for grep { !defined $self->{$_} } keys %hash;
     return \%hash;
 }
@@ -487,6 +263,8 @@ sub _load_resultset {
 
 __END__
 
+=encoding UTF-8
+
 =head1 NAME
 
 ORM::Model - Base class for ORM models
@@ -494,7 +272,8 @@ ORM::Model - Base class for ORM models
 =head1 SYNOPSIS
 
     package MyApp::Model::User;
-    use Mojo::Base 'ORM::Model', '-signatures';
+    use Moo;
+    extends 'ORM::Model';
     use ORM::Model qw(column);
 
     column id      => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -592,7 +371,6 @@ those columns exist. Returns the model instance with the primary key populated.
 =head2 find
 
     my $user = MyApp::Model::User->find(1);
-    my $user = MyApp::Model::User->find(1, $dbh);
 
 Finds a record by primary key. Returns undef if not found.
 
@@ -634,19 +412,37 @@ Returns the primary key column name (default: 'id').
 
 Returns the table name for the model.
 
-=head2 dbh
+=head2 db
 
-    MyApp::Model::User->dbh($dbh);
-    my $dbh = MyApp::Model::User->dbh;
+    my $db = MyApp::Model::User->db;
 
-Gets or sets the database handle for the class.
+Gets the ORM::DB instance for the class. The DB class is automatically
+derived from the model package name (e.g., MyApp::Model::User → MyApp::DB).
 
-=head2 db_class
+To use a custom DB instance, define C<sub _build_db> in your model:
 
-    MyApp::Model::User->db_class('MyApp::DB');
+    sub _build_db {
+        my ($self) = @_;
+        return MyApp::DB->new(dsn => 'dbi:SQLite:custom.db');
+    }
 
-Gets or sets the DB class to use for connections. Defaults to
-deriving from model package name (e.g., MyApp::Model::User → MyApp::DB).
+=head2 validations
+
+    my $rules = MyApp::Model::User->validations('email');
+
+Returns validation rules for a column.
+
+=head2 schema_name
+
+    my $schema = MyApp::Model::User->schema_name;
+
+Returns the schema name extracted from the package name (e.g., 'MyApp' from 'MyApp::Model::User').
+
+=head2 attributes
+
+    my @attrs = MyApp::Model::User->attributes;
+
+Returns list of column names (alias for C<columns>).
 
 =head1 INSTANCE METHODS
 
@@ -684,18 +480,20 @@ Deletes the record from the database.
 
     my $hash = $user->to_hash;
 
-Returns a hashref of the model's data (excluding dbh).
+Returns a hashref of the model's data (excluding the C<db> reference).
 
-=head2 dbh
+=head2 db
 
-    my $dbh = $user->dbh;
+    my $db = $user->db;
 
-Gets the database handle (from instance, class, or derived DB class).
+Gets the ORM::DB instance associated with this model. Configure by defining
+C<sub _build_db { ... }> in your model class.
 
 =head1 EXAMPLE
 
     package MyApp::Model::User;
-    use Mojo::Base 'ORM::Model', '-signatures';
+    use Moo;
+    extends 'ORM::Model';
     use ORM::Model qw(column);
 
     column id         => (is => 'rw', isa => 'Int', primary_key => 1);

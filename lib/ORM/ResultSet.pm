@@ -2,14 +2,15 @@
 package ORM::ResultSet;
 use strict;
 use warnings;
-use Mojo::Base -base, -signatures;
+use experimental 'signatures';
+use Moo;
 use Carp qw(croak);
 
-has 'class';
-has 'conditions' => sub { {} };
-has 'order_by'   => sub { [] };
-has 'limit_val';
-has 'offset_val';
+has 'class' => (is => 'ro', required => 1);
+has 'conditions' => (is => 'rw', default => sub { {} });
+has 'order_by' => (is => 'rw', default => sub { [] });
+has 'limit_val' => (is => 'rw');
+has 'offset_val' => (is => 'rw');
 
 sub where ($self, $conditions) {
     $self->conditions({ %{$self->conditions}, %$conditions });
@@ -34,7 +35,7 @@ sub offset ($self, $offset) {
 sub all ($self) {
     my $class = $self->class;
     my $table = $class->table;
-    my $dbh   = $class->dbh // croak 'No database handle';
+    my $dbh   = $class->db->dbh;
 
     my @where_parts;
     my @bind_values;
@@ -69,7 +70,7 @@ sub all ($self) {
 
     my @rows;
     while ( my $row = $sth->fetchrow_hashref ) {
-        push @rows, $class->new(%$row, dbh => $dbh);
+        push @rows, $class->new(%$row, db => $class->db);
     }
     $sth->finish;
 
@@ -84,7 +85,7 @@ sub first ($self) {
 sub count ($self) {
     my $class = $self->class;
     my $table = $class->table;
-    my $dbh   = $class->dbh // croak 'No database handle';
+    my $dbh   = $class->db->dbh;
 
     my @where_parts;
     my @bind_values;
@@ -144,7 +145,23 @@ ORM::ResultSet - Result set for chainable queries
 =head1 DESCRIPTION
 
 ORM::ResultSet provides chainable query methods for ORM models.
-It延迟 executes queries until methods like C<all>, C<first>, or C<count> are called.
+It lazily executes queries until methods like C<all>, C<first>, or C<count> are called.
+
+=head1 ATTRIBUTES
+
+=over 4
+
+=item * class - The model class (required, read-only)
+
+=item * conditions - Hashref of query conditions (read-write)
+
+=item * order_by - Arrayref of ORDER BY clauses (read-write)
+
+=item * limit_val - LIMIT value (read-write)
+
+=item * offset_val - OFFSET value (read-write)
+
+=back
 
 =head1 METHODS
 
@@ -208,7 +225,7 @@ Execute a COUNT(*) query and return the number of matching records.
     # Find all active users, ordered by name, paginated
     my $page = 2;
     my $per_page = 25;
-    
+
     my @users = MyApp::Model::User
         ->where({ active => 1 })
         ->order('name')

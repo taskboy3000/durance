@@ -5,29 +5,29 @@ This document provides guidelines for agents working on this codebase.
 ## Project Overview
 
 - **Language**: Perl
-- **Framework**: Mojolicious, Mojo::Base
-- **Database**: SQLite via DBI/DBD::SQLite
+- **OO Framework**: Moo
+- **Database Access Framework**: DBI
+- **Supported Database**: SQLite3 and MariaDB
 - **Testing**: Test2::Suite
 
 ## Project Purpose
-This project implements a web application framework using Mojolicious, providing:
-- RESTful API endpoints for user management
-- ORM integration with SQLite for data persistence
-- Test-driven development workflow with Test2::Suite
-- Example models demonstrating Perl OO patterns
+This project implements an Object Relational Mapper in Perl that has a similar workflow as Ruby on Rail's ActiveRecord ORM (https://guides.rubyonrails.org/active_record_basics.html).
 
-The application serves as a template for building Perl-based web services with modern development practices.
+* The framework should be as light-weight as possible
+* It should require as few external non-core Perl modules as possible
+* The framework should favor Convention of Configuration (https://en.wikipedia.org/wiki/Convention_over_configuration)
+* The framework should provide optional verbose logging when making SQL queries.  The raw SQL query before the execution should be logged.  The time it takes to execute a statement needs to be logged as well
+* The creation and updating of SQL tables is done through introspect of an Application's models.  That is to say the framework needs a way that given a base perl package name, it can find all of an app's models.  (This will take some designing to get right, but ORM::Schema has a good start on this)
+* The documentation should be embedded in the Perl Modules as POD
 
 ## Directory Structure
 
 ```
 lib/
 ├── ORM/
-│   ├── Base.pm      # ORM base class with CRUD operations
-│   ├── Model.pm     # Model metaprogramming
+│   ├── DB.pm        # Where DB credentials/data source name, other connection details are stored 
+│   ├── Model.pm     # The parent class users will subclass in their models 
 │   └── Schema.pm    # Schema management
-└── MyApp/Model/
-    └── User.pm      # Example models
 t/
 └── orm.t            # Test file
 ```
@@ -63,20 +63,32 @@ perltidy -st -se lib/Some/Module.pm  # stdout output
 
 ### Syntax Check
 ```bash
-perl -c lib/ORM/Base.pm
-perl -Ilib -c lib/ORM/Model.pm
+perl -wc lib/ORM/Base.pm
+perl -Ilib -wc lib/ORM/Model.pm
 ```
 
 ## Code Style Guidelines
 
 ### General Principles
+- When writing perl scripts (not .pm perl modules), use this shebang line `#!/usr/bin/env perl`
 - Always use `use strict;` and `use warnings;` at the top of every file
-- Use Mojo::Base for OO modules: `use Mojo::Base 'BaseClass';`
-- Use `-signatures` feature: `use Mojo::Base '-base', '-signatures';`
+- Always use `use experimental ('signatures');` at the top of every Perl module and Perl test file
+- Use Moo for OO perl  modules: `use Moo;`
+- Subclasses of this framework should only need `use Moo; extends 'ORM::Model';` or `use Moo; extends 'ORM::DB';`
+- If a module needs a helper function or method that does not need to be exposed to the user, those functions will start with an underscore like `_parse_dsn`.
+- Take advantage of lazy initialized attributes when designing classs.  This is a core Moo feature that saves memory.
+- Use attribute builders in Moo classes so that subclass can override values using `sub _build_attribute ($self) { return 'attr_value' }`
+- Do not `use Carp`.  Prefer the standard perl built-ins like `warn` and `die`
+- Use the Single Responsibility principle (https://en.wikipedia.org/wiki/Single-responsibility_principle)
+- Make the Perl modules easily testible
+- The framework should allow for a "dryrun mode" where the framework will report what SQL it would have executued or what DB changes would happen if a migration were run
+- The framework should provide a single method to migrate all of an applications models
+- The framework should write SQL that matches the ANSI standard as much as possible.  Exceptions to this rule include AUTO_INCREMENT for `id` columns
+- Classes in the ORM:: namespace should prefer `has-a` relationships to `is-a`.  Subclasses of ORM::Model have reference to the subclasses `ORM::DB` module for that user's application.
 
 ### Naming Conventions
 - **Packages/Modules**: UpperCamelCase (e.g., `ORM::Base`, `MyApp::Model::User`)
-- **Methods/Subroutines**: snake_case (e.g., `create_table`, `table_exists`)
+- **Methods/Subroutines**: lowerCamelCase (e.g., `createTable`, `tableExists`)
 - **Attributes**: snake_case (e.g., `dbname`, `primary_key`)
 - **Constants**: UPPER_SNAKE_CASE (e.g., `COLUMN_META`)
 
@@ -85,21 +97,29 @@ perl -Ilib -c lib/ORM/Model.pm
 package MyApp::Module;
 use strict;
 use warnings;
-use Mojo::Base 'BaseClass';
-use Carp qw(croak);
+use Moo;
+extends 'BaseClass';
 
 has 'attribute_name';
 
-sub method_name ($self, @args) {
+sub methodName ($self, @args) {
     # implementation
 }
 
 1;
+=pod
+
+=head1 ORM::Class
+
+...
+
+=cut
 ```
 
 ### Import Style
 - Use explicit import lists: `use Carp qw(croak);` not `use Carp;`
-- Group imports: core, third-party, local modules
+- Group imports: core, third-party, local modules.  
+- Sort each group alphabetically
 
 ### Formatting
 - Use 4-space indentation (no tabs)
@@ -115,13 +135,13 @@ sub my_function ($self, $arg1, $arg2 = 'default') {
 ```
 
 ### Error Handling
-- Use `croak` from Carp for user-facing errors
-- Use `carp` for warnings
+- Use `die` from Carp for user-facing errors
+- Use `warn` for warnings
 - Use DBI's `RaiseError => 1` for database errors
 - Use `//` (defined-or) not `||` for defaults
 
 ```perl
-my $dbh = $self->dbh // croak 'No database handle';
+my $dbh = $self->dbh // die 'No database handle';
 ```
 
 ### Database Operations
@@ -148,11 +168,14 @@ subtest 'ORM::Base - CRUD' => sub {
 ### Model Definition Pattern
 ```perl
 package MyApp::Model::Entity;
-use Mojo::Base 'ORM::Model';
+use Moo;
+extend 'ORM::Model';
 
-column id      => (is => 'rw', isa => 'Int', primary_key => 1);
-column name    => (is => 'rw', isa => 'Str', required => 1);
-column status  => (is => 'rw', isa => 'Str', default => 'active');
+column id         => (is => 'rw', isa => 'Int', primary_key => 1); # managed by the ORM
+column name       => (is => 'rw', isa => 'Str', required => 1);
+column status     => (is => 'rw', isa => 'Str', default => 'active');
+column created_at => (is => 'ro', isa => 'Str'); 
+column update_at  => (is => 'ro', isa => 'Str'); 
 
 sub table { 'entities' }
 
@@ -161,12 +184,12 @@ sub table { 'entities' }
 
 ### Key Patterns
 - **Global state**: Package variables with `our` (e.g., `$gDBH`)
-- **Class data**: Package hashes (e.g., `%COLUMN_META`)
+- **Class data**: Package hashes (e.g., `%gCOLUMN_META`)
 - **Method chaining**: Return `$self` from setters: `$self->name('value');`
-- **Attribute accessors**: Use Mojo's `has`
+- **Attribute accessors**: Use Moo `has`
 
 ### Testing Guidelines
-- Create temporary databases with File::Temp
+- Create temporary SQLite3 databases with File::Temp
 - Test success and failure cases
 - Clean up resources (disconnect dbh)
 

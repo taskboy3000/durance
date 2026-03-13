@@ -1,6 +1,8 @@
 # All code copyright Joe Johnston <jjohn@taskboy.com> 2026
 package MyApp::Model::admin::role;
-use base ORM::Model;
+use Moo;
+extends 'ORM::Model';
+use ORM::DSL;
 
 tablename 'roles';
 

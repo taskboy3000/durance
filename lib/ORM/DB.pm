@@ -2,16 +2,24 @@
 package ORM::DB;
 use strict;
 use warnings;
-use DBI;
+use experimental 'signatures';
+use utf8;
+
 use Carp qw(croak);
-use Mojo::Base '-base', '-signatures';
+use DBI;
+use Moo;
 
 our %HANDLES;
 
-has dsn             => undef;
-has username        => '';
-has password        => '';
-has driver_options  => sub { { RaiseError => 1, AutoCommit => 1 } };
+has dsn             => (is => 'lazy');
+has username        => (is => 'ro', predicate => 1);
+has password        => (is => 'ro', predicate => 1);
+has driver_options  => (is => 'lazy');
+
+sub _build_driver_options { { RaiseError => 1, AutoCommit => 1 } };
+sub _build_dsn ($self) {
+    die("assert: " . ref $self . " should make _build_dns to override this");
+}
 
 sub dbh ($self) {
     my $class = ref $self || $self;
@@ -44,6 +52,8 @@ sub disconnect_all {
 
 __END__
 
+=encoding UTF-8
+
 =head1 NAME
 
 ORM::DB - Database connection manager base class
@@ -72,30 +82,40 @@ credentials.
 Given model classes like C<MyApp::Model::User> or C<MyApp::Model::app::user>,
 the ORM derives the DB class by replacing C<Model> with C<DB>:
 
-    MyApp::Model::User      → MyApp::DB
-    MyApp::Model::app::user → MyApp::DB
-    Analytics::Model::Report → Analytics::DB
+    MyApp::Model::User      to MyApp::DB
+    MyApp::Model::app::user to MyApp::DB
+    Analytics::Model::Report to Analytics::DB
 
 The ORM will automatically lazy-load this class when a model needs a database
 connection.
 
-=head1 ATTRIBUTS
+=head1 ATTRIBUTES
 
 =head2 dsn
 
+    my $dsn = MyApp::DB->dsn;
+
 The DBI data source name (DSN). Example: C<dbi:SQLite:dbname=app.db>
+Lazy-initialized attribute.
 
 =head2 username
 
-Database username (default: empty string)
+    my $username = MyApp::DB->username;
+
+Database username (default: empty string). Read-only attribute.
 
 =head2 password
 
-Database password (default: empty string)
+    my $password = MyApp::DB->password;
+
+Database password (default: empty string). Read-only attribute.
 
 =head2 driver_options
 
+    my $opts = MyApp::DB->driver_options;
+
 Hashref of DBI connect options. Default: C<{ RaiseError =E<gt> 1, AutoCommit =E<gt> 1 }>
+Lazy-initialized attribute.
 
 =head1 METHODS
 
@@ -116,16 +136,18 @@ Disconnects all pooled handles. Useful for testing or clean shutdown.
 =head1 EXAMPLE
 
     package MyApp::DB;
-    use ORM::DB -base;
+    use Moo;
+    extends 'ORM::DB';
 
-    has dsn             => 'dbi:SQLite:dbname=myapp.db';
-    has driver_options  => sub { { RaiseError => 1, AutoCommit => 1 } };
+    sub _build_dsn { 'dbi:SQLite:dbname=myapp.db' };
+    sub _build_driver_options { { RaiseError => 1, AutoCommit => 1 } };
 
     1;
 
     # Now models can automatically use this connection:
     package MyApp::Model::User;
-    use ORM::Model;
+    use Moo; 
+    extends 'ORM::Model';
 
     column id   => (is => 'rw', isa => 'Int', primary_key => 1);
     column name => (is => 'rw', isa => 'Str');
