@@ -1,0 +1,308 @@
+╔═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╗
+║                     QUICK REFERENCE: ORM FRAMEWORK MODULE MATRIX                                                         ║
+╚═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════╝
+
+
+MODULE COMPARISON - QUICK REFERENCE
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  │ ASPECT                  │ ORM::DB │ ORM::DSL │ ORM::Model  │ ORM::ResultSet │ ORM::Schema
+──┼─────────────────────────┼─────────┼──────────┼─────────────┼────────────────┼────────────────
+  │ Lines of Code           │    79   │   258    │    600      │      397       │    684
+  │ Public Methods          │    3    │    5     │     22      │       8        │     11
+  │ Private Methods         │    2    │    0     │      4      │       0        │      9
+  │ Total Responsibilities  │    2    │    5     │      8      │       3        │      7
+  │ SRP Compliance          │   ✓✓    │   ✗      │    ✗✗       │      ✗         │      ✗✗
+  │ Refactoring Urgency     │  NONE   │  HIGH    │  CRITICAL   │     HIGH       │    HIGH
+
+
+DETAILED BREAKDOWN BY MODULE
+───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ ORM::DB - DATABASE CONNECTION MANAGER                                                                               ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃ RATING: ⭐⭐⭐⭐⭐ (EXCELLENT)                                                                                        ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃
+┃ ✓ STRENGTHS:
+┃   • Single responsibility: connection management only
+┃   • Clean API (3 methods, all clear)
+┃   • Good handle pooling implementation
+┃   • Optional validation via isDSNValid()
+┃   • No dependencies except DBI
+┃
+┃ ⚠ ISSUES:
+┃   • Global %HANDLES state (minor - acceptable pattern)
+┃
+┃ ✓ REQUIREMENTS MET: 4/7
+┃   ✓ Lightweight
+┃   ✓ Convention over configuration
+┃   ✓ Database abstraction
+┃   ✓ ORM operations support
+┃
+┃ RECOMMENDATION: NO CHANGES NEEDED (leave as-is)
+┃
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ ORM::DSL - DOMAIN SPECIFIC LANGUAGE                                                                                 ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃ RATING: ⭐⭐⭐ (FAIR)                                                                                                ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃
+┃ ✓ STRENGTHS:
+┃   • Lightweight (no external dependencies)
+┃   • Clean DSL functions
+┃   • Good convention over configuration (default foreign keys)
+┃   • Enables relationship definitions
+┃
+┃ ⚠ ISSUES (5 RESPONSIBILITIES):
+┃   1. Column metadata registration ............................ INTO registry
+┃   2. Column accessor generation ............................. GENERATE setters
+┃   3. Relationship definition ................................ INTO registry
+┃   4. Relationship accessor generation ....................... GENERATE methods
+┃   5. Validation rule registration ........................... INTO registry
+┃
+┃   • Tight coupling to ORM::Model package variables
+┃   • Validation in generated setters (should be separate layer)
+┃   • Symbolic references for code generation
+┃   • Foreign keys hardcoded
+┃
+┃ ✓ REQUIREMENTS MET: 4/7
+┃   ✓ Lightweight
+┃   ✓ Convention over configuration
+┃   ✓ Relationship management
+┃   ✓ ORM operations
+┃
+┃ RECOMMENDATION: REFACTOR HIGH PRIORITY
+┃   • Separate column definition from accessor generation
+┃   • Extract validation into separate concern
+┃   • Consider metadata-only approach, defer generation
+┃
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ ORM::Model - BASE CLASS (GOD OBJECT)                                                                                ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃ RATING: ⭐⭐ (POOR)                                                                                                  ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃
+┃ ⚠ CRITICAL ISSUES (GOD OBJECT WITH 8 RESPONSIBILITIES):
+┃   1. CRUD operations ......... create(), insert(), update(), delete(), save()
+┃   2. Query interface ......... find(), all(), where(), count(), first()
+┃   3. Metadata access ......... columns(), column_meta(), primary_key(), attributes()
+┃   4. Relationship access ..... has_many_relations(), belongs_to_relations(), related_to()
+┃   5. Validation access ....... validations()
+┃   6. DB management ........... db()
+┃   7. DB class derivation ..... _db_class_for()
+┃   8. Schema name extraction .. schema_name()
+┃
+┃   • 22 public methods (should be ~5-8)
+┃   • Queries directly constructed (no builder pattern)
+┃   • Hard-coded timestamps (created_at, updated_at)
+┃   • Global metadata registries
+┃   • Duplicated _db_class_for logic with Schema
+┃   • No query timing/logging
+┃   • Mix of class and instance methods
+┃
+┃ ✓ REQUIREMENTS MET: 5/7
+┃   ✓ Convention over configuration
+┃   ✓ Database abstraction
+┃   ✓ Relationship management
+┃   ✓ Query building
+┃   ✓ ORM operations (CRUD)
+┃
+┃ RECOMMENDATION: MAJOR REFACTORING CRITICAL
+┃   • Extract ORM::Model::Metadata (metadata access)
+┃   • Keep CRUD in ORM::Model but streamline
+┃   • Move query methods to ResultSet (delegate)
+┃   • Split relationship queries into own module
+┃
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ ORM::ResultSet - CHAINABLE QUERY INTERFACE                                                                          ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃ RATING: ⭐⭐⭐ (FAIR)                                                                                                ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃
+┃ ✓ STRENGTHS:
+┃   • Good chainable API design
+┃   • Handles relationships via add_joins()
+┃   • Helpful error messages
+┃   • Supports complex WHERE conditions with operators
+┃
+┃ ⚠ ISSUES (3 RESPONSIBILITIES):
+┃   1. Query state management (conditions, order, limit, offset, joins)
+┃   2. SQL generation (building SQL strings)
+┃   3. Query execution (executing prepared statements)
+┃
+┃   • Large all() method (75+ lines)
+┃   • Duplicate WHERE building (all() vs count())
+┃   • SQL concatenation directly (manual string building)
+┃   • Complex JOIN logic with metadata lookup
+┃   • No query logging or timing
+┃   • No dry-run capability
+┃
+┃ ✓ REQUIREMENTS MET: 4/7
+┃   ✓ Lightweight
+┃   ✓ Convention over configuration
+┃   ✓ Relationship management
+┃   ✓ Query building
+┃
+┃ RECOMMENDATION: REFACTOR HIGH PRIORITY
+┃   • Extract SQL builder into ORM::Query::Builder
+┃   • Remove WHERE clause duplication
+┃   • Add query logging/timing support
+┃   • Simplify all() method
+┃
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ ORM::Schema - SCHEMA MANAGEMENT & MIGRATION                                                                         ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃ RATING: ⭐⭐⭐ (FAIR)                                                                                                ┃
+┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫
+┃
+┃ ✓ STRENGTHS:
+┃   • Core schema migration works well
+┃   • Good multi-database support (sqlite, mysql)
+┃   • Model discovery via filesystem walk
+┃   • Validation methods helpful
+┃   • Optional logger callback pattern
+┃
+┃ ⚠ ISSUES (7 RESPONSIBILITIES):
+┃   1. DDL generation (CREATE TABLE SQL) ...................... BUILD DDL
+┃   2. Type mapping (ORM type → SQL type) ..................... MAP types
+┃   3. Table introspection ................................... INSPECT tables
+┃   4. Column introspection .................................. INSPECT columns
+┃   5. Migration logic (create vs alter) ...................... DECIDE strategy
+┃   6. Model discovery (filesystem walk) ...................... FIND models
+┃   7. Schema validation (pending_changes) .................... VALIDATE schema
+┃
+┃   • Type mapping hardcoded (not extensible)
+┃   • VARCHAR length hardcoded to 255
+┃   • Global @gModelClasses variable (fragile)
+┃   • Duplicate _db_class_for logic with Model
+┃   • String escaping for DEFAULT fragile (checks for \D)
+┃   • NO DRY-RUN MODE ❌ (FRAMEWORK REQUIREMENT NOT MET!)
+┃   • Logging optional but no query timing
+┃   • chdir pattern fragile
+┃
+┃ ✓ REQUIREMENTS MET: 3/7
+┃   ✓ Lightweight
+┃   ✓ Convention over configuration
+┃   ✓ Schema introspection/migration
+┃   ◐ Verbose SQL logging (partial - has logger but no query timing)
+┃
+┃ CRITICAL GAP:
+┃   ❌ NO DRY-RUN MODE (Required by AGENTS.md)
+┃
+┃ RECOMMENDATION: REFACTOR HIGH PRIORITY
+┃   • Implement dry-run mode (CRITICAL - framework requirement)
+┃   • Extract DDL builder
+┃   • Extract type mapper
+┃   • Add query timing to logger
+┃   • Deduplicate _db_class_for
+┃   • Fix DEFAULT escaping
+
+
+═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+FRAMEWORK REQUIREMENTS COMPLIANCE MATRIX
+═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+                                    │ DB  │ DSL │ Model │ ResultSet │ Schema │ Status
+────────────────────────────────────┼─────┼─────┼───────┼───────────┼────────┼──────────────────
+Lightweight                         │  ✓  │  ✓  │   ✓   │     ✓     │   ✓    │ ✓ MET
+Convention over Configuration       │  ✓  │  ✓  │   ✓   │     ✓     │   ✓    │ ✓ MET
+Database Abstraction                │  ✓  │  -  │   ✓   │     -     │   -    │ ◐ PARTIAL
+Relationship Management             │  -  │  ✓  │   ✓   │     ✓     │   -    │ ✓ MET
+Schema Introspection/Migration      │  -  │  -  │   -   │     -     │   ✓    │ ✓ MET
+Query Building                      │  -  │  -  │   ✓   │     ✓     │   -    │ ✓ MET
+ORM Operations (CRUD)               │  ✓  │  ✓  │   ✓   │     ✓     │   -    │ ✓ MET
+Verbose SQL Logging + Timing        │  ✗  │  -  │   ✗   │     ✗     │  ◐     │ ❌ NOT MET
+Dry-run Mode for Migrations         │  ✗  │  -  │   ✗   │     ✗     │  ✗     │ ❌ NOT MET
+────────────────────────────────────┴─────┴─────┴───────┴───────────┴────────┴──────────────────
+Requirements Met / Total            │ 4/7 │4/7  │ 5/7   │    4/7    │ 3/7    │ 5/9 MET (56%)
+────────────────────────────────────┴─────┴─────┴───────┴───────────┴────────┴──────────────────
+
+
+═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+REFACTORING ROADMAP
+═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+PHASE 1: ADDRESS CRITICAL REQUIREMENTS (Weeks 1-2)
+────────────────────────────────────────────────────
+  [ ] 1. Implement dry-run mode for ORM::Schema
+        → Add dry_run attribute
+        → Return DDL instead of executing
+        → Critical for framework requirements
+        
+  [ ] 2. Add verbose SQL logging layer
+        → Create ORM::Logger module
+        → Integrate with Model, ResultSet, Schema
+        → Capture query timing
+        → Log raw SQL before execution
+
+PHASE 2: RESOLVE GOD OBJECT (Weeks 3-4)
+────────────────────────────────────────
+  [ ] 1. Extract ORM::Query::Builder
+        → Consolidate SQL generation
+        → Remove WHERE duplication
+        → Share between ResultSet and Schema
+        
+  [ ] 2. Split ORM::Model
+        → Extract ORM::Model::Metadata
+        → Keep CRUD operations
+        → Delegate queries to ResultSet
+        
+  [ ] 3. Extract ORM::Relationships
+        → Relationship query methods
+        → has_many, belongs_to logic
+
+PHASE 3: CODE QUALITY (Weeks 5-6)
+──────────────────────────────────
+  [ ] 1. Refactor ORM::DSL
+        → Separate column definition from accessor generation
+        → Extract validation logic
+        
+  [ ] 2. Deduplicate code
+        → Consolidate _db_class_for
+        → Extract type mapping to ORM::Type
+        
+  [ ] 3. Improve registries
+        → Consider hashref-based instead of package variables
+        → Better test isolation
+
+PHASE 4: ENHANCEMENTS (Weeks 7-8)
+──────────────────────────────────
+  [ ] 1. Query caching
+  [ ] 2. Lazy relationship loading
+  [ ] 3. Transaction support
+
+
+═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+KEY FINDINGS SUMMARY
+═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+VIOLATIONS:
+  • 23 distinct responsibilities across 5 modules (should be ~10)
+  • ORM::Model is a God Object (8 responsibilities, 22 methods)
+  • ORM::Schema violates SRP (7 responsibilities)
+  • ORM::DSL mixes definition and code generation (5 responsibilities)
+  • ORM::ResultSet mixes state management, SQL generation, execution (3 responsibilities)
+
+CRITICAL GAPS:
+  ❌ No verbose SQL logging with query timing (AGENTS.md requirement)
+  ❌ No dry-run mode for migrations (AGENTS.md requirement)
+  ⚠️  Global registry pattern (fragile, hard to test)
+  ⚠️  Duplicated code across modules
+  ⚠️  No unified query builder
+
+STRENGTHS:
+  ✓ ORM::DB is excellent (clean separation)
+  ✓ Convention over configuration well implemented
+  ✓ Relationship management solid
+  ✓ Multi-database support good
+  ✓ Chainable API design good
+

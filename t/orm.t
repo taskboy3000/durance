@@ -228,6 +228,37 @@ subtest 'ORM::Schema - table introspection' => sub {
         my @cols = $schema->table_info($model);
         is(scalar @cols, 0, 'table_info returns empty list');
     };
+
+    subtest 'column_info returns metadata from existing table' => sub {
+        package MyApp::Model::ColumnInfoTest;
+        use Moo;
+        extends 'ORM::Model';
+        use ORM::DSL;
+
+        tablename 'column_info_test';
+        column id    => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name  => (is => 'rw', isa => 'Str', required => 1);
+        column email => (is => 'rw', isa => 'Str');
+
+        package main;
+
+        my $model = MyApp::Model::ColumnInfoTest->new(db => $db);
+        $schema->create_table($model);
+
+        # Get column info from the created table
+        my $id_info = $schema->column_info($model, 'id');
+        ok(defined $id_info, 'column_info returns data for id');
+
+        my $name_info = $schema->column_info($model, 'name');
+        ok(defined $name_info, 'column_info returns data for name');
+
+        # Verify both id and name columns are in the hash (keys from DBI)
+        ok(ref($id_info) eq 'HASH', 'id_info is a hash reference');
+        ok(ref($name_info) eq 'HASH', 'name_info is a hash reference');
+
+        my $missing_info = $schema->column_info($model, 'nonexistent');
+        is($missing_info, undef, 'column_info returns undef for missing column');
+    };
 };
 
 subtest 'ORM::Schema - table creation and migration' => sub {
@@ -1069,6 +1100,38 @@ subtest 'ORM::Model - Validation functions' => sub {
 
         my $missing_meta = MyApp::Model::MetaTest->column_meta('nonexistent');
         is(keys %$missing_meta, 0, 'returns empty hash for missing column');
+    };
+
+    subtest 'validations method' => sub {
+        package MyApp::Model::ValidationsTest;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'validations_test';
+        column id    => (is => 'rw', isa => 'Int', primary_key => 1);
+        column email => (is => 'rw', isa => 'Str');
+        column name  => (is => 'rw', isa => 'Str', length => 100);
+        column age   => (is => 'rw', isa => 'Int');
+
+        validates email => (format => qr/@/);
+        validates name  => (length => 100);
+
+        package main;
+
+        my $email_rules = MyApp::Model::ValidationsTest->validations('email');
+        ok(exists $email_rules->{format}, 'email validations include format');
+        is($email_rules->{format}, qr/@/, 'format rule is correct regex');
+
+        my $name_rules = MyApp::Model::ValidationsTest->validations('name');
+        ok(exists $name_rules->{length}, 'name validations include length');
+        is($name_rules->{length}, 100, 'length rule is correct');
+
+        my $age_rules = MyApp::Model::ValidationsTest->validations('age');
+        is(keys %$age_rules, 0, 'age has no validations');
+
+        my $missing_rules = MyApp::Model::ValidationsTest->validations('nonexistent');
+        is(keys %$missing_rules, 0, 'nonexistent column has no validations');
     };
 
     subtest 'schema_name method' => sub {
