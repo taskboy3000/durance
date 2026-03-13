@@ -18,6 +18,11 @@ sub _build_primaryKey {'id'};
 sub BUILD {
     my ($self, $args) = @_;
     
+    # Handle db argument - store it in the object's hash
+    if (exists $args->{db}) {
+        $self->{db} = delete $args->{db};
+    }
+    
     my $class = ref $self || $self;
     my $cols = $class->columns;
     
@@ -34,14 +39,27 @@ sub import {
 }
 
 sub db {
-    my $class = shift;
+    my $self = shift;
+    
+    # If db was passed to new() and stored in hash, return it
+    if (exists $self->{db}) {
+        return $self->{db};
+    }
+    
+    # Otherwise, derive from class
+    my $class = ref $self || $self;
     return $class->_db;
 }
+
+sub _db_class_for;  # forward declaration
 
 sub _db {
     my $class = shift;
     my $pkg = ref $class || $class;
-    my $db_class = $pkg->_db_class_for($pkg);
+    
+    # Call _db_class_for as a method to allow subclasses to override
+    my $db_class = $class->_db_class_for;
+    
     eval "require $db_class";
     die "Cannot load DB class $db_class: $@" if $@;
     return $db_class->new;
@@ -148,6 +166,14 @@ sub where ( $class, $conditions = {} ) {
     );
     
     return wantarray ? $rs->all : $rs;
+}
+
+sub count ($class) {
+    return $class->where({})->count;
+}
+
+sub first ($class) {
+    return $class->where({})->first;
 }
 
 # Mented to a called as a class method

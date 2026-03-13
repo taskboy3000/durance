@@ -13,8 +13,10 @@ use Moo;
 has 'dbh' => (is => 'rw');
 has 'model_class' => (is => 'rw');
 has 'driver' => (is => 'rw');
-has 'logger' => (is => 'ro', default => sub (@messages) {
-    print STDERR scalar(localtime), "[$$]", join("\n", @messages), "\n";
+has 'logger' => (is => 'ro', default => sub {
+    return sub (@messages) {
+        print STDERR scalar(localtime), "[$$]", join("\n", @messages), "\n";
+    };
 });
 
 my %TYPE_MAP = (
@@ -195,7 +197,9 @@ sub create_table ( $self, $model ) {
 
 sub table_exists ( $self, $model ) {
     my $table = ref $model ? $model->table : $model;
-    my $dbh = ref $model ? $model->db->dbh // die 'No database handle' : $self->dbh // die 'No database handle';
+    my $dbh = ref $model 
+        ? ($model->db->dbh // die 'No database handle') 
+        : ($self->dbh // die 'No database handle');
 
     my $sth  = $dbh->table_info( undef, undef, $table, undef );
     my @info = $sth->fetchrow_array;
@@ -373,7 +377,7 @@ sub sync_table ( $self, $class_or_model ) {
     if (ref $class_or_model) {
         $model = $class_or_model;
     } else {
-        my $db_class = $self->_db_class_for($class);
+        my $db_class = $self->_db_class_for($class_or_model);
         $model = $class->new(db => $db_class->new);
     }
 
