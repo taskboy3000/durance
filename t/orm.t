@@ -26,6 +26,58 @@ sub create_test_db ($app) {
     ORM::Schema->migrate_all($app);
 }
 
+subtest 'ORM::DB - attributes and methods' => sub {
+    package TestDB;
+    use Moo;
+    extends 'ORM::DB';
+
+    sub _build_dsn { 'dbi:SQLite:dbname=:memory:' }
+
+    package main;
+
+    my $db = TestDB->new;
+
+    subtest 'attributes' => sub {
+        is($db->dsn, 'dbi:SQLite:dbname=:memory:', 'dsn returns correct DSN');
+
+        is($db->username, undef, 'username defaults to undef');
+        is($db->password, undef, 'password defaults to undef');
+
+        my $opts = $db->driver_options;
+        ok($opts, 'driver_options returns truthy value');
+        is($opts->{RaiseError}, 1, 'RaiseError defaults to 1');
+        is($opts->{AutoCommit}, 1, 'AutoCommit defaults to 1');
+    };
+
+    subtest 'dbh method' => sub {
+        my $dbh = $db->dbh;
+        ok($dbh, 'dbh returns a connected handle');
+        ok(eval { $dbh->can('prepare') }, 'dbh has prepare method (is DBI handle)');
+
+        my $driver = $dbh->{Driver}{Name};
+        is($driver, 'SQLite', 'driver is SQLite');
+    };
+
+    subtest 'handle pooling' => sub {
+        my $dbh1 = $db->dbh;
+        my $dbh2 = $db->dbh;
+        is($dbh1, $dbh2, 'calling dbh twice returns same handle');
+
+        ok($dbh1->ping, 'connection is still alive');
+    };
+
+    subtest 'disconnect_all' => sub {
+        my $dbh = $db->dbh;
+        ok($dbh->ping, 'handle is connected before disconnect_all');
+
+        TestDB->disconnect_all;
+
+        ok(!$dbh->ping, 'handle is disconnected after disconnect_all');
+    };
+
+    package main;
+};
+
 subtest 'ORM::Model - Basic attributes' => sub {
     my $myApp = MyApp::DB->new();
     my @modelClass = ORM::Schema->get_all_models_for_app($myApp);

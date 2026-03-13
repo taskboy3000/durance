@@ -18,7 +18,7 @@ has driver_options  => (is => 'lazy');
 
 sub _build_driver_options { { RaiseError => 1, AutoCommit => 1 } };
 sub _build_dsn ($self) {
-    die("assert: " . ref $self . " should make _build_dns to override this");
+    die("assert: " . ref $self . " should make _build_dsn to override this");
 }
 
 sub dbh ($self) {
@@ -102,13 +102,13 @@ Lazy-initialized attribute.
 
     my $username = MyApp::DB->username;
 
-Database username (default: empty string). Read-only attribute.
+Database username (default: undef). Read-only attribute.
 
 =head2 password
 
     my $password = MyApp::DB->password;
 
-Database password (default: empty string). Read-only attribute.
+Database password (default: undef). Read-only attribute.
 
 =head2 driver_options
 
