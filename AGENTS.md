@@ -9,6 +9,7 @@ This document provides guidelines for agents working on this codebase.
 - **Database Access Framework**: DBI
 - **Supported Database**: SQLite3 and MariaDB
 - **Testing**: Test2::Suite
+- **Pending and Completed Project Tasks**: PROJECT_PLAN.md
 
 ## Project Purpose
 This project implements an Object Relational Mapper in Perl that has a similar workflow as Ruby on Rail's ActiveRecord ORM (https://guides.rubyonrails.org/active_record_basics.html).
@@ -19,6 +20,24 @@ This project implements an Object Relational Mapper in Perl that has a similar w
 * The framework should provide optional verbose logging when making SQL queries.  The raw SQL query before the execution should be logged.  The time it takes to execute a statement needs to be logged as well
 * The creation and updating of SQL tables is done through introspect of an Application's models.  That is to say the framework needs a way that given a base perl package name, it can find all of an app's models.  (This will take some designing to get right, but ORM::Schema has a good start on this)
 * The documentation should be embedded in the Perl Modules as POD
+
+## Planning Workflow
+
+### Before Starting Any New Work
+1. **Always read PROJECT_PLAN.md first** - This is the source of truth for what needs to be done
+2. Check the "Pending Tasks" section to identify the next task to work on
+3. Look for incomplete steps marked with `[ ]` or "IN PROGRESS" status
+
+### Creating New Plans
+- **Add new plans directly to PROJECT_PLAN.md** - Do NOT create separate files in plans/ directory
+- Use the format: `## Feature: <Feature Name> ✓ PLANNED`
+- Include discrete implementation steps with checkboxes `[ ]`
+- Mark completed sections with `✓ COMPLETED`
+
+### Updating Plans During Work
+- As you complete steps, mark them with `✓ COMPLETED`
+- Add implementation notes and code snippets
+- Update the status at the top of each plan section
 
 ## Directory Structure
 

@@ -1247,14 +1247,236 @@ Test ResultSet with various query operators and conditions.
 
 ### Part B: Add JOIN Support (Future Feature)
 
-Currently the ORM supports basic relationships via separate queries (N+1 problem).
-Future work could add proper SQL JOIN support.
+---
+
+## Feature: JOIN Support (ActiveRecord-style) ✓ PLANNED
+
+### Goal
+Add SQL JOIN support to the ORM so related data can be fetched in a single query.
+
+### Current State
+- `has_many` and `belongs_to` exist but run **separate queries** (N+1 problem)
+- Foreign key convention: `${name}_id` (e.g., `belongs_to company` → `company_id`)
+- ResultSet supports `where()`, `order()`, `limit()`, `offset()` but no JOINs
+
+---
+
+## Discrete Implementation Steps
+
+### Step JOIN-1: Add relationship introspection methods
+
+Add to `lib/ORM/Model.pm`:
+
+```perl
+sub has_many_relations ($class) {
+    return $ORM::DSL::_has_many{$class} // {};
+}
+
+sub belongs_to_relations ($class) {
+    return $ORM::DSL::_belongs_to{$class} // {};
+}
+
+sub related_to ($class, $name) {
+    return $ORM::DSL::_has_many{$class}{$name} 
+        // $ORM::DSL::_belongs_to{$class}{$name};
+}
+```
+
+**Test**: Verify these methods return relationship metadata.
+
+---
+
+### Step JOIN-2: Add `joins()` to ResultSet
+
+Add to `lib/ORM/ResultSet.pm`:
+
+```perl
+has 'joins' => (is => 'rw', default => sub { [] });
+
+sub joins ($self, @relations) {
+    push @{$self->joins}, @relations;
+    return $self;
+}
+```
+
+**Test**: Verify joins() can be chained.
+
+---
+
+### Step JOIN-3: Build JOIN SQL in all() method
+
+Modify `all()` to generate JOIN clauses from relationship metadata. Key logic:
+
+- **belongs_to**: `JOIN related ON related.id = local.foreign_key`
+- **has_many**: `JOIN related ON related.foreign_key = local.id`
+
+```perl
+# Build JOIN clauses
+my @join_parts;
+
+for my $rel (@{$self->joins}) {
+    my ($rel_name, $rel_opts);
+    
+    if (ref $rel eq 'HASH') {
+        ($rel_name, $rel_opts) = %$rel;
+    }
+    else {
+        $rel_name = $rel;
+        $rel_opts = {};
+    }
+    
+    # Look up relationship metadata
+    my $meta = $class->related_to($rel_name);
+    
+    # Determine JOIN type (default LEFT)
+    my $join_type = $rel_opts->{type} // 'LEFT';
+    
+    # Determine tables and keys
+    my $related_class = $meta->{isa};
+    my $related_table = $related_class->table;
+    my $foreign_key = $meta->{foreign_key} // "${rel_name}_id";
+    my $local_pk = $class->primary_key;
+    
+    # Build ON clause based on relationship type
+    my $on_clause;
+    if ($meta->{_relationship_type} eq 'belongs_to') {
+        $on_clause = "$related_table.id = $table.$foreign_key";
+    }
+    else {
+        $on_clause = "$related_table.$foreign_key = $table.$local_pk";
+    }
+    
+    # Allow override
+    $on_clause = $rel_opts->{on} // $on_clause;
+    
+    push @join_parts, "$join_type JOIN $related_table ON $on_clause";
+}
+
+# Append to SQL
+$sql .= " " . join(' ', @join_parts) if @join_parts;
+```
+
+**Test**: Verify SQL includes JOIN clauses.
+
+---
+
+### Step JOIN-4: Tag relationships with type
+
+In `lib/ORM/DSL.pm`, add `_relationship_type` to relationship metadata:
+
+```perl
+# In has_many function:
+$_has_many{$pkg}{$name}{_relationship_type} = 'has_many';
+
+# In belongs_to function:
+$_belongs_to{$pkg}{$name}{_relationship_type} = 'belongs_to';
+```
+
+**Test**: Verify relationship metadata includes type.
+
+---
+
+### Step JOIN-5: Support explicit hash overrides
+
+Allow users to override conventions:
+
+```perl
+User->joins({ accounts => { 
+    on => 'accounts.user_id = users.id',
+    type => 'INNER' 
+}})
+```
+
+**Test**: Verify explicit overrides work.
+
+---
+
+### Step JOIN-6: Add comprehensive tests
+
+Test cases to add in `t/orm.t`:
+
+1. Basic belongs_to JOIN
+2. Basic has_many JOIN
+3. Multiple JOINs
+4. JOIN with WHERE conditions
+5. JOIN with ORDER BY
+6. JOIN with LIMIT/OFFSET
+7. Explicit hash JOIN
+8. Mixed string and hash JOINs
+9. Column name collision handling
+
+---
+
+## API Design
+
+### String API (auto-detect - convention-based)
+
+```perl
+User->joins('accounts')->all           # has_many
+User->joins('company')->all             # belongs_to
+User->joins('company', 'accounts')->all # multiple JOINs
+```
+
+### Hash API (explicit override)
+
+```perl
+User->joins({ 
+    accounts => { 
+        on => 'accounts.user_id = users.id',
+        type => 'INNER' 
+    }
+})->all
+```
+
+### Mixed
+
+```perl
+User->joins('company', { accounts => { type => 'INNER' } })->all
+```
+
+---
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `lib/ORM/Model.pm` | Add `has_many_relations`, `belongs_to_relations`, `related_to` methods |
+| `lib/ORM/ResultSet.pm` | Add `joins` attribute and `joins()` method, update `all()` for JOIN SQL |
+| `lib/ORM/DSL.pm` | Tag relationships with `_relationship_type` in has_many/belongs_to |
+| `t/orm.t` | Add JOIN test subtests |
+
+---
+
+## Future Features (Post-JOIN)
+
+After basic JOINs work, these can be added later:
 
 | Feature | Description |
 |---------|-------------|
-| `has_one` | One-to-one relationship |
-| JOIN queries | Fetch related objects via SQL JOIN |
-| `many_to_many` | Junction table relationships |
+| `preload()` | Eager loading (2 queries, avoids N+1) |
+| `has_one()` | One-to-one relationship |
+| `many_to_many()` | Junction table relationships |
+| `include()` | JOIN + record inflation for nested objects |
+
+---
+
+## Key Edge Cases to Handle
+
+1. **Column name collisions**: If both tables have `id` column, need aliasing
+2. **Missing relationships**: `joins('nonexistent')` should warn or die
+3. **No primary key**: JOINs require primary keys - validate this
+4. **Chaining**: `joins()` should return $self for chaining
+5. **COUNT with JOIN**: Need special handling for COUNT queries with JOINs
+
+---
+
+## Implementation Notes
+
+1. Start with simple case: single belongs_to JOIN
+2. Test SQL output at each step before proceeding
+3. Use file-based SQLite for testing (not :memory:)
+4. Keep backward compatibility - existing has_many/belongs_to should still work
+5. Auto-detect hash vs string input in joins() method
 
 ### Files Modified
 - `t/orm.t` - Added complex query tests
