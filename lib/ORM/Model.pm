@@ -15,6 +15,19 @@ our ( %_columns, %_primary_key,
 has primaryKey => (is => 'lazy');
 sub _build_primaryKey {'id'};
 
+sub BUILD {
+    my ($self, $args) = @_;
+    
+    my $class = ref $self || $self;
+    my $cols = $class->columns;
+    
+    for my $col (@$cols) {
+        if (exists $args->{$col} && defined $args->{$col}) {
+            $self->{$col} = $args->{$col};
+        }
+    }
+}
+
 
 sub import {
     # Do nothing - users should explicitly use ORM::DSL
