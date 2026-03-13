@@ -35,7 +35,7 @@ sub offset ($self, $offset) {
 sub all ($self) {
     my $class = $self->class;
     my $table = $class->table;
-    my $dbh   = $class->_db->dbh;
+    my $dbh   = $class->db->dbh;
 
     my @where_parts;
     my @bind_values;
@@ -70,7 +70,7 @@ sub all ($self) {
 
     my @rows;
     while ( my $row = $sth->fetchrow_hashref ) {
-        push @rows, $class->new(%$row, db => $class->_db);
+        push @rows, $class->new(%$row, db => $class->db);
     }
     $sth->finish;
 
@@ -85,7 +85,7 @@ sub first ($self) {
 sub count ($self) {
     my $class = $self->class;
     my $table = $class->table;
-    my $dbh   = $class->_db->dbh;
+    my $dbh   = $class->db->dbh;
 
     my @where_parts;
     my @bind_values;

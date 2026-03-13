@@ -40,24 +40,15 @@ sub import {
 
 sub db {
     my $self = shift;
+    my $class = ref $self || $self;
     
-    # If db was passed to new() and stored in hash, return it
-    if (exists $self->{db}) {
+    # Instance: return stored db if exists
+    if (ref $self && exists $self->{db}) {
         return $self->{db};
     }
     
-    # Otherwise, derive from class
-    my $class = ref $self || $self;
-    return $class->_db;
-}
-
-sub _db {
-    my $class = shift;
-    my $pkg = ref $class || $class;
-    
-    # Call _db_class_for as a method to allow subclasses to override
+    # Derive DB class and create instance
     my $db_class = $class->_db_class_for;
-    
     eval "require $db_class";
     die "Cannot load DB class $db_class: $@" if $@;
     return $db_class->new;
@@ -121,7 +112,7 @@ sub attributes ($self) {
 sub find ( $class, $id ) {
     my $pk    = $class->primary_key;
     my $table = $class->table;
-    my $dbh   = $class->_db->dbh;
+    my $dbh   = $class->db->dbh;
 
     my $stmt = "SELECT * FROM $table WHERE $pk = ?";
     my $sth  = $dbh->prepare($stmt);
@@ -132,12 +123,12 @@ sub find ( $class, $id ) {
 
     return undef unless $row;
 
-    return $class->new(%$row, db => $class->_db);
+    return $class->new(%$row, db => $class->db);
 }
 
 sub all ($class) {
     my $table = $class->table;
-    my $dbh   = $class->_db->dbh;
+    my $dbh   = $class->db->dbh;
 
     my $stmt = "SELECT * FROM $table";
     my $sth  = $dbh->prepare($stmt);
@@ -146,7 +137,7 @@ sub all ($class) {
     my @rows;
     while ( my $row = $sth->fetchrow_hashref ) {
         push @rows,
-          $class->new( %$row, db => $class->_db );
+          $class->new( %$row, db => $class->db );
     }
     $sth->finish;
 
@@ -176,7 +167,7 @@ sub first ($class) {
 
 # Mented to a called as a class method
 sub create ( $class, $data ) {
-    my $dbh = $class->_db->dbh;
+    my $dbh = $class->db->dbh;
 
     my $now = scalar localtime;
     if ($class->can('columns')) {
@@ -189,7 +180,7 @@ sub create ( $class, $data ) {
         }
     }
 
-    return $class->new( %$data, db => $class->_db )->insert;
+    return $class->new( %$data, db => $class->db )->insert;
 }
 
 sub _columns_info ($class) {
