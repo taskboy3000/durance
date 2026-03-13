@@ -212,6 +212,12 @@ sub table { 'entities' }
 - Test success and failure cases
 - Clean up resources (disconnect dbh)
 
+### Feature Testing Preference
+- **Prefer robust test coverage before adding new features**
+- Complete all test coverage for a feature before starting the next feature
+- This ensures changes don't break existing functionality
+- Run full test suite after each change: `perl -Ilib t/orm.t`
+
 ## Documentation Guidelines
 
 ### Markdown Files

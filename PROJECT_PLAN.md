@@ -1210,40 +1210,21 @@ Test that created_at and updated_at are automatically populated.
 
 ---
 
-## Test Coverage: Complex ResultSet Queries ✓ IN PROGRESS
+## Test Coverage: Complex ResultSet Queries ✓ COMPLETED
 
 ### Goal
 Test ResultSet with various query operators and conditions.
 
 ### Part A: Test Existing Features (6 steps)
 
-#### Step RQ-1: Test where() with comparison operators
-- Add records with numeric values
-- Query with `{ age => { '>' => 21 } }`
-- Assert only matching records returned
-
-#### Step RQ-2: Test where() with LIKE operator
-- Add records with string values
-- Query with `{ name => { 'LIKE' => 'J%' } }`
-- Assert pattern matching works
-
-#### Step RQ-3: Test where() with multiple conditions
-- Query with multiple AND conditions
-- Assert all conditions applied
-
-#### Step RQ-4: Test order() with multiple columns
-- Add records
-- Query with order('name', 'age')
-- Assert correct multi-column sorting
-
-#### Step RQ-5: Test order() with DESC
-- Query with order('name DESC')
-- Assert descending order
-
-#### Step RQ-6: Test offset() without limit
-- Add records
-- Query with offset(2)
-- Assert skips first 2 records
+| Step | Description | Status |
+|------|-------------|--------|
+| RQ-1 | where() with comparison operators | ✓ COMPLETED |
+| RQ-2 | where() with LIKE operator | ✓ COMPLETED |
+| RQ-3 | where() with multiple conditions | ✓ COMPLETED |
+| RQ-4 | order() with multiple columns | ✓ COMPLETED |
+| RQ-5 | order() with DESC | ✓ COMPLETED |
+| RQ-6 | offset() without limit | ✓ COMPLETED |
 
 ### Part B: Add JOIN Support (Future Feature)
 
@@ -1467,40 +1448,6 @@ After basic JOINs work, these can be added later:
 3. **No primary key**: JOINs require primary keys - validate this
 4. **Chaining**: `joins()` should return $self for chaining
 5. **COUNT with JOIN**: Need special handling for COUNT queries with JOINs
-
----
-
-## Implementation Notes
-
-1. Start with simple case: single belongs_to JOIN
-2. Test SQL output at each step before proceeding
-3. Use file-based SQLite for testing (not :memory:)
-4. Keep backward compatibility - existing has_many/belongs_to should still work
-5. Auto-detect hash vs string input in joins() method
-
-### Files Modified
-- `t/orm.t` - Added complex query tests
-
-#### Step RQ-3: Test where() with multiple conditions
-- Query with multiple AND conditions
-- Assert all conditions applied
-
-#### Step RQ-4: Test order() with multiple columns
-- Add records
-- Query with order('name', 'age')
-- Assert correct multi-column sorting
-
-#### Step RQ-5: Test order() with DESC
-- Query with order('name DESC')
-- Assert descending order
-
-#### Step RQ-6: Test offset() without limit
-- Add records
-- Query with offset(2)
-- Assert skips first 2 records
-
-### Files to Modify
-- `t/orm.t` - Add ResultSet query tests
 
 ---
 
