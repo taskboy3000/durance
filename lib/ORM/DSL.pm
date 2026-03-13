@@ -156,7 +156,7 @@ sub load_into {
             return () unless defined $pk_val;
             
             my $result = $model_class->where({ $fk => $pk_val });
-            return wantarray ? @$result : $result;
+            return wantarray ? $result->all : $result;
         };
         
         my $create_method = "create_$name";
@@ -167,7 +167,8 @@ sub load_into {
             
             die "Cannot create related object without primary key" unless defined $pk_val;
             
-            my %data = (@args, $foreign_key => $pk_val);
+            my %data = @args == 1 && ref $args[0] eq 'HASH' ? %{$args[0]} : @args;
+            $data{$foreign_key} = $pk_val;
             return $model_class->create(\%data);
         };
         

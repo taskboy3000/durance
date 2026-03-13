@@ -412,6 +412,76 @@ subtest 'ORM::Model - CRUD operations' => sub {
     };
 };
 
+subtest 'ORM::Model - Relationship functions' => sub {
+    my $db = TestDB->new;
+    my $dbh = $db->dbh;
+    my $schema = ORM::Schema->new(dbh => $dbh);
+
+    subtest 'has_many and belongs_to relationships' => sub {
+        package MyApp::Model::Author;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'authors';
+        column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name => (is => 'rw', isa => 'Str', required => 1);
+
+        has_many posts => (is => 'rw', isa => 'MyApp::Model::Post', foreign_key => 'author_id');
+
+        package MyApp::Model::Post;
+        use Moo;
+        extends 'TestModel';
+        use ORM::DSL;
+
+        tablename 'posts';
+        column id        => (is => 'rw', isa => 'Int', primary_key => 1);
+        column author_id => (is => 'rw', isa => 'Int');
+        column title     => (is => 'rw', isa => 'Str', required => 1);
+
+        belongs_to author => (is => 'rw', isa => 'MyApp::Model::Author', foreign_key => 'author_id');
+
+        package main;
+
+        my $author_model = MyApp::Model::Author->new(db => $db);
+        my $post_model = MyApp::Model::Post->new(db => $db);
+        $schema->create_table($author_model);
+        $schema->create_table($post_model);
+
+        subtest 'has_many creates relationship method' => sub {
+            my $author = MyApp::Model::Author->create({ name => 'Alice' });
+            ok($author->can('posts'), 'has_many creates posts method');
+            ok($author->can('create_posts'), 'has_many creates create_posts method');
+        };
+
+        subtest 'belongs_to creates relationship method' => sub {
+            my $author = MyApp::Model::Author->create({ name => 'Bob' });
+            my $post = MyApp::Model::Post->create({ title => 'Test Post', author_id => $author->id });
+            
+            ok($post->can('author'), 'belongs_to creates author method');
+            my $found_author = $post->author;
+            is($found_author->name, 'Bob', 'belongs_to returns correct parent');
+        };
+
+        subtest 'has_many queries related objects' => sub {
+            my $author = MyApp::Model::Author->create({ name => 'Carol' });
+            MyApp::Model::Post->create({ title => 'Post 1', author_id => $author->id });
+            MyApp::Model::Post->create({ title => 'Post 2', author_id => $author->id });
+
+            my @posts = $author->posts;
+            is(scalar @posts, 2, 'has_many returns related objects');
+        };
+
+        subtest 'create_* method sets foreign key automatically' => sub {
+            my $author = MyApp::Model::Author->create({ name => 'Dave' });
+            my $new_post = $author->create_posts({ title => 'Auto FK Post' });
+            
+            is($new_post->author_id, $author->id, 'create_* sets foreign key');
+            is($new_post->title, 'Auto FK Post', 'create_* sets other fields');
+        };
+    };
+};
+
 subtest 'ORM::Model - Basic attributes' => sub {
     my $myApp = MyApp::DB->new();
     my @modelClass = ORM::Schema->get_all_models_for_app($myApp);
