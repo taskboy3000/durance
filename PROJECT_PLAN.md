@@ -677,7 +677,7 @@ modules.
 
 | Feature | Description | Priority | Status |
 |---------|-------------|----------|--------|
-| `has_one()` | One-to-one relationship support | Medium | ⏸️ IN PROGRESS |
+| `has_one()` | One-to-one relationship support | Medium | ✓ COMPLETED |
 | `preload()` | Eager loading (2 queries, avoids N+1) | Medium | Pending |
 | COUNT with JOIN | Special handling for COUNT queries with JOINs | Medium | ✓ COMPLETED |
 
