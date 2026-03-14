@@ -1094,6 +1094,103 @@ User->where({active => 1})->include('posts')->all;
 
 ---
 
+### Task 28. Remove Dead Code and Refactor Duplicates
+
+Clean up unused code, consolidate duplicates, and improve code consistency across the Durance ORM.
+
+**Analysis:** Found ~250 lines of dead/duplicate code across modules (see task output for full details)
+
+**Implementation Steps (discrete, testable):**
+
+**Phase 1: Remove Clearly Dead Code (High Priority)**
+
+- [ ] **Step 1a: Remove unused _columns_info method**
+  - [ ] Remove Model.pm:299-301 (_columns_info stub method)
+  - [ ] Run tests to verify no breakage
+
+- [ ] **Step 1b: Remove unused primaryKey attribute**
+  - [ ] Remove Model.pm:16-17 (has primaryKey + builder)
+  - [ ] Verify primary_key() method still works
+  - [ ] Run tests
+
+- [ ] **Step 1c: Remove unused FindBin import**
+  - [ ] Remove Schema.pm:9 (use FindBin)
+  - [ ] Run tests
+
+- [ ] **Step 1d: Remove unused package vars from Model.pm**
+  - [ ] Remove %_has_many, %_belongs_to from Model.pm:13
+  - [ ] Keep %_columns, %_primary_key, %_validations (these ARE used)
+  - [ ] Run tests
+
+- [ ] **Step 1e: Fix typo in comment**
+  - [ ] Model.pm:281 - Fix "Mented to a called" → "Meant to be called"
+
+- [ ] **Step 1f: Remove unused predicate flags**
+  - [ ] DB.pm:15-16 - Remove predicate => 1 from username/password
+  - [ ] Run tests
+
+**Phase 2: Consolidate Duplicate Code (Medium Priority)**
+
+- [ ] **Step 2a: Consolidate _db_class_for method**
+  - [ ] Keep Model.pm version (line 83-91)
+  - [ ] Update Schema.pm to call Model's _db_class_for instead
+  - [ ] Or extract to shared utility module
+  - [ ] Run tests
+
+- [ ] **Step 2b: Consolidate driver_from_dsn method**
+  - [ ] Create canonical version (lowercase) in shared location
+  - [ ] Update DDL.pm to use canonical version
+  - [ ] Update QueryBuilder.pm to use canonical version
+  - [ ] Run tests
+
+- [ ] **Step 2c: Use lazy logger attribute consistently**
+  - [ ] Model.pm: Replace 5 direct instantiations with $self->logger
+  - [ ] ResultSet.pm: Replace 6 direct instantiations with $self->logger
+  - [ ] Run tests
+
+**Phase 3: Fix Documentation (Medium Priority)**
+
+- [ ] **Step 3a: Consolidate DB.pm POD**
+  - [ ] Move useful content from after __END__ (line 109-216)
+  - [ ] Update ORM::DB references to Durance::DB
+  - [ ] Remove __END__ marker
+  - [ ] Merge into single comprehensive POD
+
+- [ ] **Step 3b: Consolidate Model.pm POD**
+  - [ ] Merge duplicate POD sections (lines 438-460, 462-724)
+  - [ ] Remove duplicate =head1 NAME entries
+  - [ ] Single consistent documentation block
+
+**Phase 4: Evaluate Optional Removals (Low Priority)**
+
+- [ ] **Step 4a: Evaluate isDSNValid method**
+  - [ ] Check if this is part of public API
+  - [ ] If only used in tests, consider removing or marking as test-only
+  - [ ] Decision: Keep or remove?
+
+- [ ] **Step 4b: Evaluate use utf8 pragma**
+  - [ ] Check if UTF-8 literals are planned
+  - [ ] Remove from DB.pm if not needed
+  - [ ] Decision: Keep or remove?
+
+- [ ] **Step 4c: Investigate _get_aliased_columns**
+  - [ ] Check if ResultSet.pm:170 version is called
+  - [ ] Check if QueryBuilder.pm:126 version is called
+  - [ ] Remove if truly unused
+
+**Verification:**
+- [ ] After each phase, run: `prove -l t/*.t`
+- [ ] All 64 tests must pass
+- [ ] No regressions
+
+**Estimated Impact:**
+- Remove ~50 lines of dead code
+- Consolidate ~80 lines of duplicates
+- Simplify ~120 lines total
+- ~250 lines cleanup (~3% of codebase)
+
+---
+
 ### Task 26. Performance Testing
 
 Benchmark SQL queries and model operations.
