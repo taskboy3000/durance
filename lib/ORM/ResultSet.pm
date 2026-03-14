@@ -379,29 +379,72 @@ Add OFFSET clause. Note: Most databases require LIMIT when using OFFSET.
 
 =head2 add_joins
 
+    # String API - use relationship names
     my $rs = $rs->add_joins('company');
-    my $rs = $rs->add_joins('company', 'department');
-    my $rs = $rs->add_joins({ company => {
-        type => 'INNER',
-        on   => 'companies.id = employees.company_id',
-    }});
+    my $rs = $rs->add_joins('company', 'posts');
+    
+    # Hash API - explicit override with custom JOIN type and ON clause
+    my $rs = $rs->add_joins({ 
+        company => {
+            type => 'INNER',
+            on   => 'companies.id = employees.company_id',
+        }
+    });
+    
+    # Mixed API - combine string and hash
+    my $rs = $rs->add_joins('company', { 
+        posts => { type => 'INNER' } 
+    });
 
-Add SQL JOIN clauses to the query. Supports two forms:
+Add SQL JOIN clauses to the query. Supports multiple approaches:
 
 =over 4
 
-=item * B<String API> - Relationship names that match defined
-C<has_many> or C<belongs_to> relationships.  If the name does not
-match any known relationship, C<add_joins> will C<die> immediately
-with an error listing the available relationships.
+=item * B<String API> - Use relationship names defined via C<has_many> or 
+C<belongs_to> declarations in your model. JOIN type defaults to LEFT JOIN. 
+If the name does not match any known relationship, C<add_joins> will C<die> 
+immediately with an error listing the available relationships.
 
-=item * B<Hash API> - Explicit override with custom JOIN type and
-ON clause.  Hash refs are B<not validated> against the model's
-relationships, so you can join arbitrary tables this way.
+=item * B<Hash API> - Explicit override with custom JOIN type and ON clause.
+Hash refs are B<not validated> against the model's relationships, so you can 
+join arbitrary tables this way.
+
+=item * B<Mixed API> - Combine string and hash forms in a single call for 
+flexibility when some relationships are standard and others need customization.
 
 =back
 
-Returns C<$self> for method chaining.
+Returns C<$self> for method chaining. Joins are applied to both C<all()> and 
+C<count()> queries.
+
+B<Relationship Type Handling:>
+
+Joins work with both relationship types:
+
+=over 4
+
+=item * B<belongs_to> - Joins the related table with a simple COUNT(*) since 
+each record matches at most one related record.
+
+    # Employee belongs_to Company
+    my @employees = Employee->where({})
+        ->add_joins('company')
+        ->all;
+    # SQL: SELECT * FROM employees LEFT JOIN companies 
+    #      ON companies.id = employees.company_id
+
+=item * B<has_many> - For C<count()> queries with has_many JOINs, uses 
+COUNT(DISTINCT table.id) to avoid duplicate counting when the joined table has 
+multiple matches.
+
+    # Company has_many Employees
+    my $company_count = Company->where({})
+        ->add_joins('employees')
+        ->count;
+    # SQL: SELECT COUNT(DISTINCT companies.id) FROM companies 
+    #      LEFT JOIN employees ON employees.company_id = companies.id
+
+=back
 
 B<Error behavior (string API only):>
 
@@ -434,10 +477,47 @@ Execute the query with LIMIT 1 and return the first record (or undef).
 =head2 count
 
     my $count = $rs->count;
+    
+    # With WHERE conditions
+    my $active_count = $rs->where({ active => 1 })->count;
+    
+    # With JOINs
+    my $count = $rs->add_joins('company')->count;
 
-Execute a COUNT(*) query and return the number of matching records.
+Execute a COUNT query and return the number of matching records.
 
-=head1 EXAMPLE
+When JOINs are present, the COUNT is intelligently adjusted based on the 
+relationship type:
+
+=over 4
+
+=item * B<No JOINs or belongs_to JOINs> - Uses COUNT(*) since each record 
+matches at most one related record.
+
+    my $count = User->where({})->add_joins('company')->count;
+    # SQL: SELECT COUNT(*) FROM users LEFT JOIN companies ...
+
+=item * B<has_many JOINs> - Uses COUNT(DISTINCT table.id) to avoid counting 
+duplicate rows when the joined table has multiple matches.
+
+    my $count = Company->where({})->add_joins('employees')->count;
+    # SQL: SELECT COUNT(DISTINCT companies.id) FROM companies 
+    #      LEFT JOIN employees ...
+
+=item * B<Multiple JOINs> - DISTINCT is used if any JOIN is has_many, 
+otherwise COUNT(*) is used.
+
+    my $count = Company->where({})
+        ->add_joins('employees', 'department')
+        ->count;
+    # SQL: SELECT COUNT(DISTINCT companies.id) FROM companies 
+    #      LEFT JOIN employees ... LEFT JOIN department ...
+
+=back
+
+=head1 EXAMPLES
+
+=head2 Basic Queries
 
     # Find all active users, ordered by name, paginated
     my $page = 2;
@@ -455,5 +535,113 @@ Execute a COUNT(*) query and return the number of matching records.
 
     # Find first matching user
     my $user = MyApp::Model::User->where({ email => 'john@example.com' })->first;
+
+=head2 JOINs with String API (Convention-Based)
+
+    # Model definitions:
+    # package MyApp::Model::Employee;
+    #   belongs_to company => (...);
+    #   has_many projects => (...);
+    #
+    # package MyApp::Model::Company;
+    #   has_many employees => (...);
+
+    # Single belongs_to JOIN
+    my @employees = MyApp::Model::Employee
+        ->where({})
+        ->add_joins('company')
+        ->all;
+    # SQL: SELECT * FROM employees LEFT JOIN companies 
+    #      ON companies.id = employees.company_id
+
+    # Single has_many JOIN
+    my @companies = MyApp::Model::Company
+        ->where({})
+        ->add_joins('employees')
+        ->all;
+    # SQL: SELECT * FROM companies LEFT JOIN employees 
+    #      ON employees.company_id = companies.id
+
+    # Multiple JOINs
+    my @employees = MyApp::Model::Employee
+        ->where({})
+        ->add_joins('company', 'projects')
+        ->all;
+    # SQL: SELECT * FROM employees 
+    #      LEFT JOIN companies ON ...
+    #      LEFT JOIN projects ON ...
+
+=head2 JOINs with Hash API (Explicit Override)
+
+    # Custom JOIN type (INNER instead of LEFT)
+    my @employees = MyApp::Model::Employee
+        ->where({})
+        ->add_joins({
+            company => { type => 'INNER' }
+        })
+        ->all;
+    # SQL: SELECT * FROM employees INNER JOIN companies ON ...
+
+    # Custom ON clause for non-standard relationships
+    my @employees = MyApp::Model::Employee
+        ->where({})
+        ->add_joins({
+            company => {
+                type => 'INNER',
+                on   => 'companies.id = employees.company_id AND companies.active = 1'
+            }
+        })
+        ->all;
+
+    # Join arbitrary tables
+    my @employees = MyApp::Model::Employee
+        ->where({})
+        ->add_joins({
+            salary_history => {
+                type => 'LEFT',
+                on   => 'salary_history.employee_id = employees.id'
+            }
+        })
+        ->all;
+
+=head2 JOINs with COUNT
+
+    # COUNT with belongs_to JOIN (simple COUNT)
+    my $count = MyApp::Model::Employee
+        ->where({ salary => { '>' => 50000 } })
+        ->add_joins('company')
+        ->count;
+    # SQL: SELECT COUNT(*) FROM employees 
+    #      LEFT JOIN companies ON ... WHERE salary > 50000
+
+    # COUNT with has_many JOIN (uses DISTINCT)
+    my $count = MyApp::Model::Company
+        ->where({ active => 1 })
+        ->add_joins('employees')
+        ->count;
+    # SQL: SELECT COUNT(DISTINCT companies.id) FROM companies 
+    #      LEFT JOIN employees ON ... WHERE active = 1
+
+    # COUNT with multiple JOINs
+    my $count = MyApp::Model::Employee
+        ->where({})
+        ->add_joins('company', 'projects')
+        ->count;
+    # SQL: SELECT COUNT(DISTINCT employees.id) FROM employees 
+    #      LEFT JOIN companies ON ...
+    #      LEFT JOIN projects ON ...
+
+=head2 Mixed String and Hash JOINs
+
+    # Combine standard relationships with explicit overrides
+    my @data = MyApp::Model::Employee
+        ->where({})
+        ->add_joins('company', {
+            projects => { type => 'INNER' }
+        })
+        ->all;
+    # SQL: SELECT * FROM employees 
+    #      LEFT JOIN companies ON ... (string API)
+    #      INNER JOIN projects ON ...  (hash API)
 
 =cut
