@@ -12,7 +12,7 @@ schema management, relationship support (has_many, belongs_to, has_one,
 many_to_many), SQL JOIN queries, eager loading (preload), validations,
 and auto-timestamps.
 
-**Test Suite:** 6 test files, 36 tests, ALL PASSING
+**Test Suite:** 7 test files, 40 tests, ALL PASSING
 
 ---
 
@@ -376,6 +376,8 @@ developer experience and catch errors early.
 | `t/has_one.t` | has_one relationship tests |
 | `t/preload.t` | preload tests |
 | `t/count_with_join.t` | COUNT with JOIN tests |
+| `t/many_to_many.t` | many_to_many relationship tests |
+| `t/column_aliasing.t` | Column aliasing for JOIN tests |
 | `t/MyApp/DB.pm` | Test DB configuration |
 | `t/MyApp/Model/app/user.pm` | Test model (users table) |
 | `t/MyApp/Model/admin/role.pm` | Test model (roles table) |
@@ -618,7 +620,7 @@ method now respects JOIN specifications and applies DISTINCT when needed.
 - ✅ All 15 original test suites PASSING
 - ✅ All 9 logger test suites PASSING
 - ✅ All 8 COUNT with JOIN test suites PASSING (new)
-- ✅ **Total: 32 tests passing**
+- ✅ **Total: 40 tests passing**
 - ✅ SQL logging verified: proper DISTINCT syntax in output
 - ✅ No breaking changes to public API
 
@@ -974,7 +976,7 @@ for my $user (@users) {
 - ✅ SQL logging shows preload queries
 
 **Test Results:**
-- Total tests: 52 passing (15 orm + 9 logger + 8 count_with_join + 10 has_one + 10 preload)
+- Total tests: 40 passing (7 test files)
 
 **Effort Estimate:** 4-5 hours
 
@@ -984,7 +986,7 @@ for my $user (@users) {
 |---------|-------------|----------|--------|
 | MariaDB support | Add database driver support and tests for MariaDB | Low | Pending |
 | `include()` | JOIN + record inflation for nested objects | Low | Pending |
-| Column aliasing | Handle column name collisions in JOINs | Low | Pending |
+| Column aliasing | Handle column name collisions in JOINs | Low | ✓ COMPLETED |
 | Performance testing | Benchmark SQL queries and model operations | Low | Pending |
 
 ---
