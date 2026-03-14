@@ -33,9 +33,18 @@ sub BUILD {
     my $class = ref $self || $self;
     my $cols = $class->columns;
     
+    # Copy defined columns
     for my $col (@$cols) {
         if (exists $args->{$col} && defined $args->{$col}) {
             $self->{$col} = $args->{$col};
+        }
+    }
+    
+    # Also preserve any keys with __ (aliased columns from JOINs/include)
+    # These are needed for include() inflation
+    for my $key (keys %$args) {
+        if ($key =~ /__/ && !exists $self->{$key}) {
+            $self->{$key} = $args->{$key};
         }
     }
 }

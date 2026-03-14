@@ -13,6 +13,7 @@ has 'limit_val' => (is => 'rw');
 has 'offset_val' => (is => 'rw');
 has 'join_specs' => (is => 'rw', default => sub { [] });
 has 'preload_specs' => (is => 'rw', default => sub { [] });
+has 'include_specs' => (is => 'rw', default => sub { [] });
 
 has 'logger' => (is => 'lazy');
 sub _build_logger ($self) {
@@ -131,6 +132,41 @@ sub preload ($self, @relations) {
     return $self;
 }
 
+sub include ($self, @relations) {
+    my $class = $self->class;
+
+    for my $rel (@relations) {
+        my $meta = $class->related_to($rel);
+        unless ($meta) {
+            my $class_name = ref $class || $class;
+            my $all_rels = $class->all_relations;
+
+            my $msg = "Invalid include: '$class_name' has no"
+                    . " relationship named '$rel'\n";
+
+            if (keys %$all_rels) {
+                $msg .= "Available relationships:\n";
+                for my $name (sort keys %$all_rels) {
+                    $msg .= "  - $name ($all_rels->{$name})\n";
+                }
+            }
+            else {
+                $msg .= "$class_name has no defined"
+                       . " relationships.\n"
+                       . "Define relationships with"
+                       . " has_many, belongs_to, has_one, or many_to_many"
+                       . " in your model.\n";
+            }
+
+            die $msg;
+        }
+
+        push @{$self->include_specs}, $rel;
+    }
+
+    return $self;
+}
+
 sub _get_aliased_columns ($self) {
     my $class = $self->class;
     my $main_table = $class->table;
@@ -175,6 +211,52 @@ sub _get_aliased_columns ($self) {
     return wantarray ? @col_specs : \@col_specs;
 }
 
+sub _is_to_many_relation ($self, $rel_name) {
+    my $class = $self->class;
+    my $meta = $class->related_to($rel_name);
+    return 0 unless $meta && ref $meta eq 'HASH';
+    
+    my $rel_type = $meta->{_relationship_type} // '';
+    return $rel_type eq 'has_many' || $rel_type eq 'many_to_many';
+}
+
+sub _build_include_joins ($self) {
+    my $class = $self->class;
+    my $main_table = $class->table;
+    my @join_clauses;
+    
+    for my $rel_name (@{$self->include_specs}) {
+        my $meta = $class->related_to($rel_name);
+        next unless $meta && ref $meta eq 'HASH';
+        
+        my $rel_class = $meta->{isa};
+        my $rel_table = $rel_class->table;
+        my $rel_type = $meta->{_relationship_type};
+        my $fk = $meta->{foreign_key};
+        
+        next unless $fk;
+        
+        my $on_clause;
+        if ($rel_type eq 'belongs_to') {
+            # belongs_to: FK is on main table
+            # books.author_id = authors.id
+            $on_clause = "$main_table.$fk = $rel_table.id";
+        }
+        elsif ($rel_type eq 'has_many' || $rel_type eq 'has_one') {
+            # has_many/has_one: FK is on related table
+            # authors.id = books.author_id
+            $on_clause = "$main_table.id = $rel_table.$fk";
+        }
+        else {
+            next;
+        }
+        
+        push @join_clauses, "LEFT JOIN $rel_table ON $on_clause";
+    }
+    
+    return @join_clauses;
+}
+
 sub all ($self) {
     my $class = $self->class;
     my $table = $class->table;
@@ -187,6 +269,37 @@ sub all ($self) {
         offset_val => $self->offset_val,
         join_specs => $self->join_specs,
     });
+
+    my @include_joins = $self->_build_include_joins;
+    my $has_include = @include_joins && @{$self->include_specs};
+    
+    if ($has_include) {
+        my @cols = ("$table.*");
+        for my $rel_name (@{$self->include_specs}) {
+            my $meta = $class->related_to($rel_name);
+            next unless $meta && ref $meta eq 'HASH';
+            my $rel_class = $meta->{isa};
+            my $rel_table = $rel_class->table;
+            my $rel_cols = $rel_class->columns;
+            for my $col (@$rel_cols) {
+                push @cols, "$rel_table.$col AS ${rel_table}__$col";
+            }
+        }
+        
+        my $col_list = join(', ', @cols);
+        $sql =~ s/^SELECT \* /SELECT $col_list /;
+        
+        # Insert JOINs before WHERE/ORDER BY/LIMIT
+        my $join_sql = ' ' . join(' ', @include_joins);
+        if ($sql =~ /( WHERE | ORDER BY | LIMIT )/) {
+            # Insert joins before the first clause
+            $sql =~ s/( WHERE | ORDER BY | LIMIT )/$join_sql$1/;
+        }
+        else {
+            # No WHERE/ORDER/LIMIT, just append joins
+            $sql .= $join_sql;
+        }
+    }
 
     my $start = time();
     my $sth = $dbh->prepare($sql);
@@ -202,11 +315,20 @@ sub all ($self) {
     my @rows;
     my $main_table = $class->table;
     while ( my $row = $sth->fetchrow_hashref ) {
-        if (@{$self->join_specs}) {
+        if (@{$self->join_specs} || $has_include) {
             my %mapped_row;
             for my $key (keys %$row) {
                 if ($key =~ /^${main_table}__(.+)$/) {
+                    # Main table columns - strip prefix
                     $mapped_row{$1} = $row->{$key};
+                }
+                elsif ($key =~ /__/) {
+                    # Related table columns - keep with prefix for _inflate_included
+                    $mapped_row{$key} = $row->{$key};
+                }
+                else {
+                    # Non-prefixed columns (shouldn't happen with aliases but handle it)
+                    $mapped_row{$key} = $row->{$key};
                 }
             }
             push @rows, $class->new(%mapped_row, db => $class->db);
@@ -217,7 +339,10 @@ sub all ($self) {
     }
     $sth->finish;
 
-    if (@{$self->preload_specs} && @rows) {
+    if ($has_include && @rows) {
+        @rows = $self->_inflate_included(\@rows);
+    }
+    elsif (@{$self->preload_specs} && @rows) {
         $self->_eager_load(\@rows);
     }
 
@@ -393,6 +518,88 @@ sub _eager_load ($self, $rows) {
             $parent->{$key} = $related_by_parent{$lookup_key};
         }
     }
+}
+
+sub _inflate_included ($self, $rows) {
+    my $class = $self->class;
+    my $pk = $class->primary_key;
+    my $main_table = $class->table;
+    
+    my %unique_parents;
+    my @parent_order;  # Track order for ORDER BY preservation
+    my %related_data;
+    
+    # First pass: collect all rows and group related data by parent
+    for my $row_obj (@$rows) {
+        my $parent_id = $row_obj->$pk;
+        next unless defined $parent_id;
+        
+        # Store parent once and track order
+        unless (exists $unique_parents{$parent_id}) {
+            $unique_parents{$parent_id} = $row_obj;
+            push @parent_order, $parent_id;
+        }
+        
+        # Collect related data
+        for my $rel_name (@{$self->include_specs}) {
+            my $meta = $class->related_to($rel_name);
+            next unless $meta && ref $meta eq 'HASH';
+            
+            my $rel_class = $meta->{isa};
+            my $rel_table = $rel_class->table;
+            my $is_to_many = $self->_is_to_many_relation($rel_name);
+            
+            my $rel_cols = $rel_class->columns;
+            my %rel_data;
+            my $has_related = 0;
+            
+            for my $col (@$rel_cols) {
+                my $key = "${rel_table}__$col";
+                if (exists $row_obj->{$key}) {
+                    $rel_data{$col} = $row_obj->{$key};
+                    $has_related = 1 if defined $row_obj->{$key};
+                }
+            }
+            
+            if ($has_related) {
+                my $rel_obj = $rel_class->new(%rel_data, db => $class->db);
+                
+                if ($is_to_many) {
+                    push @{$related_data{$parent_id}{$rel_name}}, $rel_obj;
+                }
+                else {
+                    $related_data{$parent_id}{$rel_name} = $rel_obj;
+                }
+            }
+        }
+    }
+    
+    # Second pass: attach related data to unique parents (in original order)
+    my @unique_rows = map { $unique_parents{$_} } @parent_order;
+    
+    for my $parent (@unique_rows) {
+        my $parent_id = $parent->$pk;
+        next unless defined $parent_id;
+        
+        for my $rel_name (@{$self->include_specs}) {
+            my $is_to_many = $self->_is_to_many_relation($rel_name);
+            my $key = "_preloaded_$rel_name";
+            
+            if ($is_to_many) {
+                $parent->{$key} = $related_data{$parent_id}{$rel_name} // [];
+            }
+            else {
+                $parent->{$key} = $related_data{$parent_id}{$rel_name};
+            }
+        }
+        
+        # Clean up aliased columns to prevent memory bloat
+        for my $key (keys %$parent) {
+            delete $parent->{$key} if $key =~ /__/;
+        }
+    }
+    
+    return @unique_rows;
 }
 
 sub first ($self) {
