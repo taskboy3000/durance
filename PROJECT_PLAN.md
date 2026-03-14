@@ -8,29 +8,11 @@
 
 All core ORM functionality is implemented and tested. The framework provides
 an ActiveRecord-style ORM in Perl using Moo, with full CRUD operations,
-schema management, relationship support, SQL JOIN queries, validations,
+schema management, relationship support (has_many, belongs_to, has_one,
+many_to_many), SQL JOIN queries, eager loading (preload), validations,
 and auto-timestamps.
 
-**Test Suite:** 15 test suites, ALL PASSING
-
-```
-ok 1 - Durance::DB - attributes and methods
-ok 2 - Durance::Schema - constructor and attributes
-ok 3 - Durance::Schema - DDL generation
-ok 4 - Durance::Schema - table introspection
-ok 5 - Durance::Schema - table creation and migration
-ok 6 - Durance::Model - CRUD operations
-ok 7 - Durance::Model - Error handling
-ok 8 - Durance::Model - Auto-timestamps
-ok 9 - Durance::Model - Complex ResultSet Queries
-ok 10 - Durance::Model - Relationship functions
-ok 11 - Durance::Model - JOIN Support
-ok 12 - Durance::Model - Validation functions
-ok 13 - Durance::Schema - Schema Validation
-ok 14 - Durance::ResultSet - JOIN Validation
-ok 15 - Durance::Model - Basic attributes
-1..15
-```
+**Test Suite:** 6 test files, 36 tests, ALL PASSING
 
 ---
 
@@ -499,14 +481,14 @@ Add eager loading support for many_to_many relationships.
 
 ---
 
-### 20. Documentation Update
+### 20. Documentation Update ✓ COMPLETED
 
 Update documentation to reflect all implemented features.
 
-- [ ] Update Durance::DSL POD with many_to_many syntax
-- [ ] Update README.md with many_to_many example
-- [ ] Update Public API Reference in PROJECT_PLAN.md
-- [ ] Mark many_to_many complete in Future Features table
+- [x] Update Durance::DSL POD with many_to_many syntax
+- [x] Update README.md with many_to_many example
+- [x] Update Public API Reference in PROJECT_PLAN.md
+- [x] Mark many_to_many complete in Future Features table
 
 ---
 
