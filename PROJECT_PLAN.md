@@ -66,10 +66,12 @@ ok 15 - Durance::Model - Basic attributes
 - `validations($name)` - Validation rules for a column
 - `schema_name` - Schema name extracted from package
 - `attributes` - Alias for columns
-- `all_relations` - Hash of all relationships (both has_many and belongs_to)
-  with types: `{ name => 'has_many'|'belongs_to', ... }`
+- `all_relations` - Hash of all relationships (has_many, belongs_to, has_one, many_to_many)
+  with types: `{ name => 'has_many'|'belongs_to'|'has_one'|'many_to_many', ... }`
 - `has_many_relations` - Hash of has_many relationship metadata
 - `belongs_to_relations` - Hash of belongs_to relationship metadata
+- `has_one_relations` - Hash of has_one relationship metadata
+- `many_to_many_relations` - Hash of many_to_many relationship metadata
 - `related_to($name)` - Relationship metadata for a named relation
 
 **Instance Methods:**
@@ -130,6 +132,8 @@ ok 15 - Durance::Model - Basic attributes
 - `tablename $name` - Set the table name
 - `has_many $name => (%opts)` - Define has-many relationship
 - `belongs_to $name => (%opts)` - Define belongs-to relationship
+- `has_one $name => (%opts)` - Define has-one relationship
+- `many_to_many $name => (%opts)` - Define many-to-many relationship
 - `validates $name => (%opts)` - Define validation rules
 
 ### Durance::Logger
@@ -476,8 +480,29 @@ my @authors = $book->authors; # SELECT * FROM authors ...
   - [ ] Test preload support
 
 - [ ] **Step 7: Update documentation**
-  - [ ] Add many_to_many to DSL documentation
-  - [ ] Update README with example
+  - [x] Add many_to_many to DSL documentation
+  - [x] Update README with example
+
+---
+
+### 19. Preload Support for many_to_many
+
+Add eager loading support for many_to_many relationships.
+
+- [ ] Add preload handling in ResultSet for many_to_many relationships
+- [ ] Use JOIN query with DISTINCT to collect parent IDs, then IN clause
+- [ ] Write tests for many_to_many preload
+
+---
+
+### 20. Documentation Update
+
+Update documentation to reflect all implemented features.
+
+- [ ] Update Durance::DSL POD with many_to_many syntax
+- [ ] Update README.md with many_to_many example
+- [ ] Update Public API Reference in PROJECT_PLAN.md
+- [ ] Mark many_to_many complete in Future Features table
 
 ---
 
@@ -788,6 +813,7 @@ modules.
 | `has_one()` | One-to-one relationship support | Medium | ✓ COMPLETED |
 | `preload()` | Eager loading (2 queries, avoids N+1) | Medium | ✓ COMPLETED |
 | COUNT with JOIN | Special handling for COUNT queries with JOINs | Medium | ✓ COMPLETED |
+| `many_to_many()` | Junction table relationships | Medium | ✓ COMPLETED |
 
 ### 17. preload() - ✓ COMPLETED
 

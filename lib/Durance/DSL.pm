@@ -39,7 +39,7 @@ Durance::DSL - DSL functions for ORM models
 This module exports DSL functions for defining ORM models.
 
 Use this module after C<use Moo; extends 'Durance::Model'> to get the
-column, tablename, has_many, belongs_to, and validates functions.
+column, tablename, has_many, belongs_to, has_one, many_to_many, and validates functions.
 
 =head1 FUNCTIONS
 
@@ -359,6 +359,52 @@ our $VERSION = '0.01';
 1;
 
 =pod
+
+=head1 FUNCTIONS
+
+=head2 many_to_many
+
+Defines a many-to-many relationship using a junction table.
+
+    many_to_many books => (
+        through => 'author_books',  # junction table
+        using   => 'book_id',       # foreign key in junction table
+        isa     => 'MyApp::Model::Book',
+    );
+
+Parameters:
+
+=over 4
+
+=item * C<through> - Name of the junction/join table (required)
+
+=item * C<using> - Column name in the junction table that references the related model (required)
+
+=item * C<isa> - The related model class (required)
+
+=back
+
+Example:
+
+    # Authors and Books via author_books junction table
+    package MyApp::Model::Author;
+    use Moo;
+    extends 'Durance::Model';
+    use Durance::DSL;
+    
+    tablename 'authors';
+    column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+    column name => (is => 'rw', isa => 'Str');
+    
+    many_to_many books => (
+        through => 'author_books',
+        using   => 'book_id',
+        isa     => 'MyApp::Model::Book',
+    );
+    
+    # Usage
+    my @books = $author->books;  # Get all books by this author
+    my @authors = $book->authors; # Get all authors of this book
 
 =head1 EXAMPLE
 

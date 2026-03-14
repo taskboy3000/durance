@@ -81,13 +81,56 @@ $user->delete;
 ## Features
 
 - CRUD operations
-- Relationships (has_many, belongs_to, has_one)
+- Relationships (has_many, belongs_to, has_one, many_to_many)
 - SQL JOIN support
 - Eager loading (preload)
 - Schema migration
 - Validations
 - SQL logging
 - Embedded POD in every Perl module
+
+## Relationships
+
+### has_many
+
+```perl
+has_many posts => ( is => 'rw', isa => 'MyApp::Model::Post' );
+```
+
+### belongs_to
+
+```perl
+belongs_to user => ( is => 'rw', isa => 'MyApp::Model::User' );
+```
+
+### has_one
+
+```perl
+has_one profile => ( is => 'rw', isa => 'MyApp::Model::Profile' );
+```
+
+### many_to_many
+
+```perl
+# Define on both sides of the relationship
+package MyApp::Model::Author;
+use Moo;
+extends 'Durance::Model';
+use Durance::DSL;
+
+tablename 'authors';
+column id   => ( is => 'rw', isa => 'Int', primary_key => 1 );
+column name => ( is => 'rw', isa => 'Str' );
+
+many_to_many books => (
+    through => 'author_books',
+    using   => 'book_id',
+    isa     => 'MyApp::Model::Book',
+);
+
+# Usage
+my @books = $author->books;
+```
 
 ## Supported Databases
 
