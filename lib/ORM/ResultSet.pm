@@ -97,7 +97,49 @@ sub all ($self) {
     my $sql = "SELECT * FROM $table";
 
     # Build JOIN clauses
+    my @join_parts = $self->_build_join_sql();
+    $sql .= " " . join(' ', @join_parts) if @join_parts;
+
+    $sql .= " WHERE " . join(' AND ', @where_parts) if @where_parts;
+    $sql .= " ORDER BY " . join(', ', @{$self->order_by}) if @{$self->order_by};
+    if (defined $self->limit_val) {
+        $sql .= " LIMIT " . $self->limit_val;
+    }
+    elsif (defined $self->offset_val) {
+        $sql .= " LIMIT 1000000";
+    }
+    $sql .= " OFFSET " . $self->offset_val if defined $self->offset_val;
+
+    my $start = time();
+    my $sth = $dbh->prepare($sql);
+    $sth->execute(@bind_values);
+    my $duration = (time() - $start) * 1000;
+    
+    if ($ENV{ORM_SQL_LOGGING}) {
+        my $logger = ORM::Logger->new;
+        my $params_str = @bind_values ? '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @bind_values) . ']' : '';
+        $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $sql $params_str");
+    }
+
+    my @rows;
+    while ( my $row = $sth->fetchrow_hashref ) {
+        push @rows, $class->new(%$row, db => $class->db);
+    }
+    $sth->finish;
+
+    return wantarray ? @rows : \@rows;
+}
+
+sub first ($self) {
+    my @rows = $self->limit(1)->all;
+    return $rows[0];
+}
+
+sub _build_join_sql ($self) {
+    my $class = $self->class;
+    my $table = $class->table;
     my @join_parts;
+
     for my $rel (@{$self->join_specs}) {
         my ($rel_name, $rel_opts);
 
@@ -172,41 +214,30 @@ sub all ($self) {
         }
     }
 
-    $sql .= " " . join(' ', @join_parts) if @join_parts;
-
-    $sql .= " WHERE " . join(' AND ', @where_parts) if @where_parts;
-    $sql .= " ORDER BY " . join(', ', @{$self->order_by}) if @{$self->order_by};
-    if (defined $self->limit_val) {
-        $sql .= " LIMIT " . $self->limit_val;
-    }
-    elsif (defined $self->offset_val) {
-        $sql .= " LIMIT 1000000";
-    }
-    $sql .= " OFFSET " . $self->offset_val if defined $self->offset_val;
-
-    my $start = time();
-    my $sth = $dbh->prepare($sql);
-    $sth->execute(@bind_values);
-    my $duration = (time() - $start) * 1000;
-    
-    if ($ENV{ORM_SQL_LOGGING}) {
-        my $logger = ORM::Logger->new;
-        my $params_str = @bind_values ? '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @bind_values) . ']' : '';
-        $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $sql $params_str");
-    }
-
-    my @rows;
-    while ( my $row = $sth->fetchrow_hashref ) {
-        push @rows, $class->new(%$row, db => $class->db);
-    }
-    $sth->finish;
-
-    return wantarray ? @rows : \@rows;
+    return @join_parts;
 }
 
-sub first ($self) {
-    my @rows = $self->limit(1)->all;
-    return $rows[0];
+sub _needs_distinct ($self) {
+    # Return true if any join_specs include has_many relationships
+    my $class = $self->class;
+
+    for my $rel (@{$self->join_specs}) {
+        my $rel_name;
+
+        if (ref $rel eq 'HASH') {
+            ($rel_name) = keys %$rel;
+        }
+        else {
+            $rel_name = $rel;
+        }
+
+        my $meta = $class->related_to($rel_name);
+        if ($meta && $meta->{_relationship_type} eq 'has_many') {
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 sub count ($self) {
@@ -231,7 +262,15 @@ sub count ($self) {
         }
     }
 
-    my $sql = "SELECT COUNT(*) FROM $table";
+    # Build JOIN clauses
+    my @join_parts = $self->_build_join_sql();
+
+    # Determine if we need DISTINCT
+    my $needs_distinct = $self->_needs_distinct();
+    my $count_expr = $needs_distinct ? "COUNT(DISTINCT $table." . $class->primary_key . ")" : "COUNT(*)";
+
+    my $sql = "SELECT $count_expr FROM $table";
+    $sql .= " " . join(' ', @join_parts) if @join_parts;
     $sql .= " WHERE " . join(' AND ', @where_parts) if @where_parts;
 
     my $start = time();

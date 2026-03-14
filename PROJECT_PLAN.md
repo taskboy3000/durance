@@ -460,7 +460,98 @@ and performance analysis. Built with Test-Driven Development approach.
 
 ---
 
-### 14. Dry-Run Mode (DEFERRED)
+### 14. COUNT with JOIN ✓ COMPLETED
+
+Implemented proper COUNT(*) support for queries with JOINs. The `ResultSet->count()` 
+method now respects JOIN specifications and applies DISTINCT when needed.
+
+**Problem (Fixed):**
+- ❌ `User->where({})->add_joins('posts')->count()` was ignoring JOINs
+- ❌ Missing DISTINCT handling for has_many JOINs (would count duplicates)
+- ❌ JOIN clauses from `add_joins()` were not applied to COUNT queries
+
+**Requirements (All Fulfilled):**
+- ✅ COUNT queries respect JOIN specifications
+- ✅ DISTINCT applied for has_many relationships (avoids duplicate counting)
+- ✅ Relationship type auto-detected (belongs_to vs has_many)
+- ✅ belongs_to: uses simple COUNT(*) (one row per match)
+- ✅ has_many: uses COUNT(DISTINCT main_table.id) to avoid duplicates
+- ✅ SQL logging support (via ORM::Logger with timing)
+- ✅ COUNT works with WHERE conditions and JOINs combined
+
+**Implementation (Test-Driven Development):**
+
+**Files Created:**
+- `t/count_with_join.t` - Comprehensive test suite (8 test cases, all passing)
+
+**Files Modified:**
+- `lib/ORM/ResultSet.pm` - Added JOIN and DISTINCT support to count() + refactored all()
+
+**Sub-Tasks Completed:**
+- ✅ Step 1: Created comprehensive test suite with 8 test scenarios
+- ✅ Step 2: Analyzed current count() and JOIN logic in all()
+- ✅ Step 3: Extracted `_build_join_sql()` helper method (used by both all() and count())
+- ✅ Step 4: Implemented `_needs_distinct()` for DISTINCT detection
+- ✅ Step 5: Updated count() method with full JOIN and DISTINCT support
+- ✅ Step 6: Integration testing - all tests pass, no regressions
+
+**Test Results:**
+- ✅ All 15 original test suites PASSING
+- ✅ All 9 logger test suites PASSING
+- ✅ All 8 COUNT with JOIN test suites PASSING (new)
+- ✅ **Total: 32 tests passing**
+- ✅ SQL logging verified: proper DISTINCT syntax in output
+- ✅ No breaking changes to public API
+
+**Example Usage After Implementation:**
+```perl
+# belongs_to JOIN - COUNT returns matching books
+my $count = Book->where({})->add_joins('author')->count;
+# SQL: SELECT COUNT(*) FROM books LEFT JOIN authors ON ...
+
+# has_many JOIN - COUNT uses DISTINCT to avoid duplicates
+my $count = Author->where({})->add_joins('books')->count;
+# SQL: SELECT COUNT(DISTINCT authors.id) FROM authors LEFT JOIN books ...
+
+# Multiple JOINs with WHERE conditions
+my $count = PublishedBook->where({})
+               ->add_joins('publisher', 'author')
+               ->count;
+# SQL: SELECT COUNT(*) FROM published_books 
+#      LEFT JOIN publishers ON ...
+#      LEFT JOIN authors ON ...
+```
+
+**Design Implementation:**
+- `_build_join_sql()` - Extracts JOIN SQL generation (eliminates duplication)
+  - Used by both `all()` and `count()` for consistency
+  - Handles string/hash API, override validation, duplicate prevention
+  - ~60 lines of logic, reusable
+
+- `_needs_distinct()` - Detects has_many relationships in join_specs
+  - Returns true if any JOIN needs DISTINCT
+  - Examines `_relationship_type` metadata
+  - ~12 lines of logic
+
+- Updated `count()` - Now supports JOINs and DISTINCT
+  - Calls `_build_join_sql()` to build JOIN clauses
+  - Uses `COUNT(DISTINCT table.id)` when needed
+  - Preserves WHERE clause and SQL logging
+  - ~35 lines total (down from 40 with duplication)
+
+**SQL Logging Examples (with `ORM_SQL_LOGGING=1`):**
+```
+SELECT COUNT(*) FROM authors
+SELECT COUNT(*) FROM books LEFT JOIN authors ON authors.id = books.author_id WHERE published = ?
+SELECT COUNT(DISTINCT authors.id) FROM authors LEFT JOIN books ON books.author_id = authors.id
+SELECT COUNT(*) FROM published_books LEFT JOIN publishers ... LEFT JOIN authors ...
+```
+
+**Effort Completed:** 3 hours
+
+---
+
+### 15. Dry-Run Mode (DEFERRED)
 
 **Status: DEFERRED** - No immediate use case identified.
 
@@ -588,7 +679,7 @@ modules.
 |---------|-------------|----------|--------|
 | `preload()` | Eager loading (2 queries, avoids N+1) | Medium | Pending |
 | `has_one()` | One-to-one relationship support | Medium | Pending |
-| COUNT with JOIN | Special handling for COUNT queries with JOINs | Medium | Pending |
+| COUNT with JOIN | Special handling for COUNT queries with JOINs | Medium | ✓ COMPLETED |
 
 ### Long Term
 
