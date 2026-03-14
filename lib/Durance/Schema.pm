@@ -15,35 +15,33 @@ has 'dbh' => (is => 'rw');
 has 'model_class' => (is => 'rw');
 has 'driver' => (is => 'rw');
 has 'logger' => (is => 'lazy');
+has 'ddl' => (
+    is      => 'lazy',
+    builder => '_build_ddl',
+);
 
 sub _build_logger ($self) {
     require Durance::Logger;
     return Durance::Logger->new;
 }
 
-my %TYPE_MAP = (
-    sqlite => {
-        Int       => 'INTEGER',
-        Str       => 'TEXT',
-        Text      => 'TEXT',
-        Bool      => 'INTEGER',
-        Float     => 'REAL',
-        Timestamp => 'TEXT',
-    },
-    mysql => {
-        Int       => 'INTEGER',
-        Str       => 'VARCHAR',
-        Text      => 'TEXT',
-        Bool      => 'TINYINT(1)',
-        Float     => 'DOUBLE',
-        Timestamp => 'TIMESTAMP',
-    },
-);
+sub _build_ddl ($self) {
+    require Durance::DDL;
+    my $driver = $self->_detect_driver;
+    return Durance::DDL->new(driver => $driver);
+}
 
-my %AUTO_INCREMENT = (
-    sqlite => 'AUTOINCREMENT',
-    mysql  => 'AUTO_INCREMENT',
-);
+sub _detect_driver ( $self, $dbh = undef ) {
+    return $self->driver if $self->driver;
+
+    $dbh //= $self->dbh;
+    return 'sqlite' unless $dbh;
+
+    my $driver = eval { $dbh->{Driver}{Name} } // '';
+    return 'sqlite' if $driver eq 'SQLite';
+    return 'mysql'  if $driver eq 'mysql';
+    return 'sqlite';
+}
 
 sub _db_class_for ($class) {
     my $pkg = $class =~ /::$/ ? $class : $class;
@@ -53,6 +51,15 @@ sub _db_class_for ($class) {
         $pkg = "$1DB";
     }
     return $pkg;
+}
+
+sub ddl_for_class ( $self, $class_name, $driver = undef ) {
+    my $ddl = $self->ddl;
+    if ($driver) {
+        require Durance::DDL;
+        $ddl = Durance::DDL->new(driver => $driver);
+    }
+    return $ddl->ddl_for_class($class_name);
 }
 
 sub _get_dbh_for {
@@ -81,105 +88,6 @@ sub _get_dbh_for {
         . "Set dbh on schema or ensure $db_class can provide one.";
 }
 
-sub _detect_driver ( $self, $dbh = undef ) {
-    return $self->driver if $self->driver;
-
-    $dbh //= $self->dbh;
-    return 'sqlite' unless $dbh;
-
-    my $driver = eval { $dbh->{Driver}{Name} } // '';
-    return 'sqlite' if $driver eq 'SQLite';
-    return 'mysql'  if $driver eq 'mysql';
-    return 'sqlite';
-}
-
-sub _type_for ( $self, $driver, $isa, $meta = {} ) {
-    my $map = $TYPE_MAP{$driver} // $TYPE_MAP{sqlite};
-    my $sql_type = $map->{$isa} // $map->{Str};
-
-    if ($isa eq 'Str' && $driver eq 'mysql') {
-        my $len = $meta->{length} // 255;
-        $sql_type = "VARCHAR($len)";
-    }
-
-    return $sql_type;
-}
-
-sub _column_sql ( $self, $name, $type, $meta, $driver = undef ) {
-    $driver //= $self->_detect_driver;
-    my $sql = "$name ";
-
-    $sql .= $self->_type_for($driver, $type, $meta);
-
-    if ( $meta->{required}
-        || (defined $meta->{nullable} && $meta->{nullable} eq '0') )
-    {
-        $sql .= ' NOT NULL';
-    }
-
-    if ( defined $meta->{default} ) {
-        my $default = $meta->{default};
-        if ($default =~ /\D/) {
-            $default = "'$default'";
-        }
-        $sql .= " DEFAULT $default";
-    }
-
-    if ( $meta->{unique} ) {
-        $sql .= ' UNIQUE';
-    }
-
-    return $sql;
-}
-
-sub _pk_sql ( $self, $pk, $driver = undef ) {
-    $driver //= $self->_detect_driver;
-    my $auto = $AUTO_INCREMENT{$driver} // $AUTO_INCREMENT{sqlite};
-    return "$pk INTEGER PRIMARY KEY $auto";
-}
-
-sub _build_columns_def ( $self, $class, $driver = undef ) {
-    $driver //= $self->_detect_driver;
-    my @defs;
-
-    my $attrs = $class->attributes;
-    my $pk    = $class->primary_key;
-
-    for my $attr (@$attrs) {
-        next if $attr eq $pk;
-        next if $attr eq 'dbh';
-
-        my $meta = $class->column_meta($attr) // {};
-        my $type = $meta->{isa} // 'Str';
-
-        my $col_def = $self->_column_sql( $attr, $type, $meta, $driver );
-        push @defs, $col_def if $col_def;
-    }
-
-    return join ', ', @defs;
-}
-
-sub _build_create_table_sql ( $self, $class, $driver = undef ) {
-    $driver //= $self->_detect_driver;
-
-    my $table       = $class->table;
-    my $pk          = $class->primary_key;
-    my $columns_def = $self->_build_columns_def($class, $driver);
-
-    my $sql = "CREATE TABLE $table (";
-    $sql .= $self->_pk_sql($pk, $driver);
-    $sql .= ", $columns_def" if $columns_def;
-    $sql .= ")";
-
-    return $sql;
-}
-
-sub ddl_for_class ( $self, $class_name, $driver = undef ) {
-    $driver //= $self->_detect_driver;
-    return $self->_build_create_table_sql($class_name, $driver);
-}
-
-
 sub create_table ( $self, $model ) {
     my $class = ref $model;
     my $table = $model->table;
@@ -189,8 +97,7 @@ sub create_table ( $self, $model ) {
         return $self->migrate($model);
     }
 
-    my $driver = $self->_detect_driver($dbh);
-    my $sql    = $self->_build_create_table_sql($class, $driver);
+    my $sql = $self->ddl->build_create_table_sql($class);
 
     my $start = time();
     $dbh->do($sql);
@@ -342,16 +249,12 @@ sub migrate ( $self, $model) {
     my $table = $model->table;
     my $dbh   = $model->db->dbh // die 'No database handle';
 
-    my $driver = $self->_detect_driver($dbh); # Is this needed?
-
     $self->logger->log("Migrating model '$class'");
 
-    # Does this table exist?
     if (!$self->table_exists($model)) {
         return $self->create_table($model);
     }
 
-    # This is an existing table
     my %existing;
     for my $col ( $self->table_info($model) ) {
         $existing{ $col->{COLUMN_NAME} } = 1;
@@ -368,17 +271,14 @@ sub migrate ( $self, $model) {
         my $meta = $class->column_meta($attr) // {};
         my $type = $meta->{isa} // 'Str';
 
-        if ( my $col_def = $self->_column_sql($attr, $type, $meta, $driver) )
-        {
-            my $sql = "ALTER TABLE $table ADD COLUMN $col_def";
-            
-            my $start = time();
-            $dbh->do($sql);
-            my $duration = (time() - $start) * 1000;
-            
-            if ($ENV{ORM_SQL_LOGGING}) {
-                $self->logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $sql");
-            }
+        my $sql = $self->ddl->build_alter_table_add_column($table, $attr, $type, $meta);
+        
+        my $start = time();
+        $dbh->do($sql);
+        my $duration = (time() - $start) * 1000;
+        
+        if ($ENV{ORM_SQL_LOGGING}) {
+            $self->logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $sql");
         }
     }
 
@@ -392,7 +292,7 @@ sub sync_table ( $self, $class_or_model ) {
     if (ref $class_or_model) {
         $model = $class_or_model;
     } else {
-        my $db_class = $self->_db_class_for($class_or_model);
+        my $db_class = $class->_db_class_for;
         $model = $class->new(db => $db_class->new);
     }
 

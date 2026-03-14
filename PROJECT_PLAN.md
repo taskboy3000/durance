@@ -416,6 +416,7 @@ use Test2::V0;
 | `lib/Durance/DB.pm` | Database connection management |
 | `lib/Durance/ResultSet.pm` | Chainable query builder |
 | `lib/Durance/QueryBuilder.pm` | SQL query building with driver support |
+| `lib/Durance/DDL.pm` | Driver-aware SQL DDL generation |
 | `lib/Durance/Schema.pm` | Schema introspection and migration |
 | `lib/Durance/Logger.pm` | SQL logging to STDERR |
 | `t/orm.t` | Comprehensive test suite |
@@ -882,6 +883,107 @@ Add database driver support and tests for MariaDB.
 
 ---
 
+### Task 27. Split Durance::Schema (Separate Migration from DDL) ✓ COMPLETED
+
+Extract DDL generation and migration logic from Durance::Schema into separate modules to comply with SRP.
+
+**Current Problem:**
+- Durance::Schema has 7 responsibilities (Mixed concerns)
+- DDL generation mixed with migration logic
+- Introspection mixed with table creation
+
+**Important: Driver-Aware DDL Generation**
+
+Like Durance::QueryBuilder, DDL generation must be driver-aware because different databases (SQLite, MySQL, MariaDB, PostgreSQL) have different:
+- Column type mappings (e.g., BOOL vs TINYINT vs BOOLEAN)
+- AUTOINCREMENT syntax (SQLite vs MySQL)
+- Index definitions
+- Foreign key constraints
+
+The Durance::DDL module MUST require driver information (either passed in or extracted from DSN) to generate correct SQL.
+
+**Implementation Steps:**
+
+- [x] **Step 1: Analyze Durance::Schema responsibilities**
+  - [x] Document all methods in Durance::Schema
+  - [x] Categorize into responsibility groups
+
+- [x] **Step 2: Create Durance::DDL module**
+  - [x] Extract DDL generation (CREATE TABLE, ALTER TABLE)
+  - [x] Create `lib/Durance/DDL.pm`
+  - [x] Move type mapping logic
+  - [x] **REQUIRE driver attribute (required)**
+  - [x] Add `driver_from_dsn()` helper
+  - [x] Add driver-aware type mapping (SQLite, MySQL, MariaDB)
+  - [x] Add driver-aware AUTOINCREMENT syntax
+
+- [ ] **Step 3: Create Durance::Migration module** (DEFERRED - not needed)
+  - Migration logic remains in Schema.pm, delegates to DDL
+
+- [x] **Step 4: Update Durance::Schema**
+  - [x] Delegate to DDL module
+  - [x] Keep introspection methods
+  - [x] Keep migration methods (sync_table, migrate, migrate_all)
+
+- [x] **Step 5: Update tests**
+  - [x] All existing tests pass
+  - [x] No regressions
+
+**Completed:**
+
+- Created `lib/Durance/DDL.pm` with:
+  - Required `driver` attribute
+  - `driver_from_dsn()` method for DSN-based driver detection
+  - Driver-aware type mapping (SQLite, MySQL, MariaDB)
+  - `ddl_for_class()` - generate CREATE TABLE SQL
+  - `build_create_table_sql()` - internal CREATE TABLE
+  - `build_alter_table_add_column()` - generate ALTER TABLE ADD COLUMN
+
+- Updated `lib/Durance/Schema.pm`:
+  - Added `ddl` attribute (lazy builder)
+  - `ddl_for_class()` now delegates to Durance::DDL
+  - `create_table()` uses DDL module
+  - `migrate()` uses DDL module
+  - Removed duplicate type mapping code
+
+**Target Architecture:**
+
+```
+Durance::Schema (introspection + migration)
+    |
+    +-- Durance::DDL (DDL generation)
+          - driver attribute (REQUIRED)
+          - ddl_for_class()
+          - driver_from_dsn()
+          - type mapping (per driver)
+```
+
+**Reference: Durance::QueryBuilder Driver Pattern**
+
+```perl
+package Durance::DDL;
+use Moo;
+
+has 'driver' => (is => 'rw', required => 1);
+
+sub driver_from_dsn ($self, $dsn) {
+    # Extract driver from DBI DSN: dbi:SQLite:... -> SQLite
+    my ($driver) = $dsn =~ /^dbi:(\w+):/i;
+    return lc $driver // 'sqlite';
+}
+
+sub _map_type ($self, $perl_type) {
+    my %map = (
+        sqlite => { Bool => 'INTEGER', Int => 'INTEGER', Str => 'TEXT' },
+        mysql  => { Bool => 'TINYINT(1)', Int => 'INT', Str => 'VARCHAR(255)' },
+        # ...
+    );
+    return $map{$self->driver}{$perl_type} // $map{sqlite}{$perl_type};
+}
+```
+
+---
+
 ### Task 25. include() Method
 
 Implement JOIN + record inflation for nested objects.
@@ -1152,3 +1254,6 @@ my $user = MyApp::Model::User->create({ name => 'John' });
 | Schema Validation & JOIN Validation | ✓ DONE | schema_valid, ensure_schema_valid, add_joins validation |
 | Full Test Coverage | ✓ DONE | 15 test suites passing |
 | preload() Eager Loading | ✓ DONE | 10 test suites in t/preload.t |
+| Column Aliasing for JOINs | ✓ DONE | Task 21 - handles column collisions |
+| QueryBuilder Extraction | ✓ DONE | Task 23 - refactored to Durance::QueryBuilder |
+| DDL Module Extraction | ✓ DONE | Task 27 - refactored to Durance::DDL |

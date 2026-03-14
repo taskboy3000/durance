@@ -337,6 +337,25 @@ subtest 'Durance::Schema - table creation and migration' => sub {
         is(ref $changes, 'ARRAY', 'sync_table returns array ref');
         is(scalar @$changes, 1, 'sync_table returns one change (table created)');
     };
+
+    subtest 'Step 3.3c: Test sync_table with class name (not instance)' => sub {
+        package MyApp::Model::SyncTest4;
+        use Moo;
+        extends 'TestModel';
+        use Durance::DSL;
+
+        tablename 'sync_test4';
+        column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+        column name => (is => 'rw', isa => 'Str');
+
+        package main;
+        $db->dbh->do("DROP TABLE IF EXISTS sync_test4");
+
+        my $changes = $schema->sync_table('MyApp::Model::SyncTest4');
+        ok($schema->table_exists('sync_test4'), 'sync_table with class name creates table');
+        is(ref $changes, 'ARRAY', 'sync_table returns array ref');
+        is(scalar @$changes, 1, 'sync_table returns one change (table created)');
+    };
 };
 
 subtest 'Durance::Model - CRUD operations' => sub {
