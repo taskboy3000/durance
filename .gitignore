@@ -5,6 +5,7 @@ t/MyApp/var/test.db
 
 # Perl build products
 Makefile
+Makefile.dev
 Makefile.old
 pm_to_blib
 META.json
