@@ -141,16 +141,22 @@ sub has_one_relations ($class) {
     return $Durance::DSL::_has_one{$class_name} // {};
 }
 
+sub many_to_many_relations ($class) {
+    my $class_name = ref $class || $class;
+    return $Durance::DSL::_many_to_many{$class_name} // {};
+}
+
 sub related_to ($class, $name) {
     my $class_name = ref $class || $class;
     return $Durance::DSL::_has_many{$class_name}{$name} 
         // $Durance::DSL::_belongs_to{$class_name}{$name}
-        // $Durance::DSL::_has_one{$class_name}{$name};
+        // $Durance::DSL::_has_one{$class_name}{$name}
+        // $Durance::DSL::_many_to_many{$class_name}{$name};
 }
 
 sub all_relations ($class) {
-    # Unified accessor for all relationships (has_many, belongs_to, has_one)
-    # Returns: { relationship_name => 'has_many'|'belongs_to'|'has_one', ... }
+    # Unified accessor for all relationships (has_many, belongs_to, has_one, many_to_many)
+    # Returns: { relationship_name => 'has_many'|'belongs_to'|'has_one'|'many_to_many', ... }
     # NOTE: Hash key order is undefined; callers should use sort if consistent
     #       ordering is needed (e.g., for error messages or deterministic SQL)
     my %rels;
@@ -165,6 +171,10 @@ sub all_relations ($class) {
     my $ho = $class->has_one_relations;
     for my $name (keys %$ho) {
         $rels{$name} = 'has_one';
+    }
+    my $m2m = $class->many_to_many_relations;
+    for my $name (keys %$m2m) {
+        $rels{$name} = 'many_to_many';
     }
     return \%rels;
 }

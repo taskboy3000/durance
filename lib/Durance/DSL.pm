@@ -6,7 +6,7 @@ use experimental 'signatures';
 
 
 # Package variables from Durance::Model that we need to access
-our ( %_has_many, %_has_one, %_belongs_to, %_validations );
+our ( %_has_many, %_has_one, %_belongs_to, %_many_to_many, %_validations );
 
 =pod
 
@@ -239,6 +239,78 @@ sub load_into {
             
             # Return single object (not array like has_many)
             return $model_class->where({ $fk => $pk_val })->first;
+        };
+        
+        return;
+    };
+
+    # Export many_to_many function
+    *{"${caller}::many_to_many"} = sub ($name, %opts) {
+        my $pkg = caller;
+
+        # Store in many_to_many registry
+        $_many_to_many{$pkg}{$name} = \%opts;
+        
+        # Tag with relationship type
+        $_many_to_many{$pkg}{$name}{_relationship_type} = 'many_to_many';
+        
+        my $isa = $opts{isa};
+        my $through = $opts{through}
+            or die "many_to_many '$name' requires 'through' parameter";
+        my $using = $opts{using}
+            or die "many_to_many '$name' requires 'using' parameter";
+        
+        # Store the through and using for later use
+        $_many_to_many{$pkg}{$name}{through} = $through;
+        $_many_to_many{$pkg}{$name}{using} = $using;
+        
+        # The local foreign key depends on which direction we're going
+        # If Author has_many books via author_books, local FK is author_id
+        # If Book has_many authors via author_books, local FK is book_id
+        my $parent_name = $pkg;
+        $parent_name =~ s/.+::(.+?)$/$1/;
+        $parent_name = lc($parent_name);
+        my $local_foreign_key = "${parent_name}_id";
+        
+        $_many_to_many{$pkg}{$name}{local_fk} = $local_foreign_key;
+        
+        # many_to_many accessor returns array of related objects
+        *{"${pkg}::${name}"} = sub ($self) {
+            # Check for preloaded data first
+            my $key = "_preloaded_$name";
+            if (exists $self->{$key}) {
+                return $self->{$key};
+            }
+            
+            my $model_class = $isa;
+            my $pk = $self->primary_key;
+            my $pk_val = $self->$pk;
+            
+            return () unless defined $pk_val;
+            
+            # Query through junction table
+            # SELECT * FROM related 
+            # JOIN through ON related.id = through.using
+            # WHERE through.local_fk = self.pk
+            my $related_table = $model_class->table;
+            my $local_fk = $local_foreign_key;
+            
+            my $sql = "SELECT $related_table.* FROM $related_table "
+                    . "JOIN $through ON $related_table.id = $through.$using "
+                    . "WHERE $through.$local_fk = ?";
+            
+            my $db = $self->db;
+            my $dbh = $db->dbh;
+            my $sth = $dbh->prepare($sql);
+            $sth->execute($pk_val);
+            
+            my @results;
+            while (my $row = $sth->fetchrow_hashref) {
+                push @results, $model_class->new($row);
+            }
+            $sth->finish;
+            
+            return wantarray ? @results : \@results;
         };
         
         return;

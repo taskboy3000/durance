@@ -444,21 +444,21 @@ my @authors = $book->authors; # SELECT * FROM authors ...
 
 **Implementation Steps (DDT):**
 
-- [ ] **Step 1: Design the DSL syntax**
-  - [ ] Define `many_to_many` function in Durance::DSL
-  - [ ] Support `through` (junction table) parameter
-  - [ ] Support `using` (foreign key column) parameter
-  - [ ] Auto-derive junction table name if not provided
+- [x] **Step 1: Design the DSL syntax**
+  - [x] Define `many_to_many` function in Durance::DSL
+  - [x] Support `through` (junction table) parameter
+  - [x] Support `using` (foreign key column) parameter
+  - [x] Auto-derive junction table name if not provided
 
-- [ ] **Step 2: Add relationship metadata**
-  - [ ] Store `many_to_many` relationships in `%_many_to_many` package var
-  - [ ] Add `many_to_many_relations()` method to Durance::Model
-  - [ ] Update `all_relations()` to include many_to_many
+- [x] **Step 2: Add relationship metadata**
+  - [x] Store `many_to_many` relationships in `%_many_to_many` package var
+  - [x] Add `many_to_many_relations()` method to Durance::Model
+  - [x] Update `all_relations()` to include many_to_many
 
-- [ ] **Step 3: Implement accessor method**
-  - [ ] Generate accessor method on model class
-  - [ ] Handle both directions (Author->books, Book->authors)
-  - [ ] Use EXISTS or JOIN query to fetch related records
+- [x] **Step 3: Implement accessor method**
+  - [x] Generate accessor method on model class
+  - [x] Handle both directions (Author->books, Book->authors)
+  - [x] Use EXISTS or JOIN query to fetch related records
 
 - [ ] **Step 4: Add preload support**
   - [ ] Support preloading many_to_many relationships
@@ -468,10 +468,10 @@ my @authors = $book->authors; # SELECT * FROM authors ...
   - [ ] Allow creating new related records via junction table
   - [ ] `create_book($author, { title => 'New Book' })` creates book and junction
 
-- [ ] **Step 6: Write tests**
-  - [ ] Create test models (Author, Book, AuthorBook)
-  - [ ] Test basic many_to_many access
-  - [ ] Test bidirectional access
+- [x] **Step 6: Write tests**
+  - [x] Create test models (Author, Book, AuthorBook)
+  - [x] Test basic many_to_many access
+  - [x] Test bidirectional access
   - [ ] Test with where conditions
   - [ ] Test preload support
 
