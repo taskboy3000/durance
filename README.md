@@ -6,6 +6,8 @@ A lightweight ActiveRecord-style ORM for Perl using Moo and DBI.
 
 ### From CPAN
 
+2026-03-14: NOT YET AVAILABLE ON CPAN
+
 ```bash
 cpan Durance
 ```
