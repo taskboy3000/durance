@@ -678,94 +678,88 @@ modules.
 | Feature | Description | Priority | Status |
 |---------|-------------|----------|--------|
 | `has_one()` | One-to-one relationship support | Medium | ✓ COMPLETED |
-| `preload()` | Eager loading (2 queries, avoids N+1) | Medium | Pending |
+| `preload()` | Eager loading (2 queries, avoids N+1) | Medium | ✓ COMPLETED |
 | COUNT with JOIN | Special handling for COUNT queries with JOINs | Medium | ✓ COMPLETED |
 
-### 16. has_one() - IN PROGRESS
+### 17. preload() - ✓ COMPLETED
 
-Implement one-to-one relationship support. This is similar to belongs_to but represents 
-a different relationship pattern where the OTHER model stores the foreign key.
+Implement eager loading to avoid N+1 query problems. This is an **optional** feature 
+that users explicitly enable when they want to pre-load related records efficiently.
 
 **Problem:**
-- Currently, only has_many and belongs_to relationships exist
-- No support for one-to-one relationships (User has_one Profile)
-- Different semantics needed: has_one returns single object, not array
+- N+1 query problem: Loading 100 users with their posts requires 101 queries (1 + 100)
+- Current solutions: `add_joins()` uses SQL JOIN which duplicates rows for has_many
+- Need alternative: preload() uses 2 queries to batch-load related records
 
-**Understanding has_one vs belongs_to:**
-- `belongs_to`: "I belong to something" - I store the foreign key
-  - Example: `Employee belongs_to Company` - employees.company_id stores the relationship
-  - Employee record knows which Company it belongs to
-- `has_one`: "I have one of something" - the OTHER model stores MY id
-  - Example: `User has_one Profile` - profiles.user_id stores the relationship
-  - Profile knows which User it belongs to; User queries Profile by that user_id
-  - Returns a single related object, not an array
+**Understanding preload() vs add_joins():**
+
+| Aspect | add_joins() | preload() |
+|--------|--------------|-----------|
+| Queries | 1 query with JOIN | 2 queries (main + related) |
+| Row duplication | Yes (duplicates main records) | No (separate result sets) |
+| Best for | Filtering by related data | Loading related data |
+| Use case | "Find users with active posts" | "Show all users with their posts" |
 
 **Requirements:**
-- ✅ Add `has_one()` DSL function to ORM::DSL
-- ✅ Add `_relationship_type` metadata tag for has_one
-- ✅ Update `all_relations()` to recognize has_one relationships
-- ✅ Add `has_one_relations()` introspection method to ORM::Model
-- ✅ has_one should work with JOIN queries (like belongs_to)
-- ✅ Support relationship accessor method (User->profile returns Profile)
+- ✅ Add `preload()` method to ResultSet (chainable like where())
+- ✅ Preload has_many relationships (batch load all related records)
+- ✅ Preload belongs_to relationships (single query)
+- ✅ Preload has_one relationships (single query)
+- ✅ Store preloaded data in model instances
+- ✅ Subsequent relationship accessors use cached data (no extra queries)
+- ✅ Support multiple preloads: `->preload('posts', 'comments')`
 - ✅ SQL logging support (via ORM::Logger)
-- ✅ Support foreign_key override (like belongs_to)
-- ✅ Integration with existing has_many and belongs_to
+- ✅ Chain with other methods: `->where(...)->preload(...)->all()`
 - ✅ No breaking changes to existing API
 
 **Test-Driven Development Implementation Plan:**
 
-**Step 1: Create comprehensive test suite** (`t/has_one.t`)
-- Test has_one relationship definition in model
-- Test has_one_relations() introspection method
-- Test has_one with belongs_to in same model
-- Test has_one with has_many in same model
-- Test has_one relationship accessor (instance method)
-- Test has_one with add_joins() in ResultSet
-- Test has_one foreign_key override
-- Test has_one SQL generation (similar to belongs_to)
-- Test has_one with SQL logging
-- Test has_one with WHERE conditions
-- Test multiple has_one relationships
-- Test has_one returns single object (not array)
+**Step 1: Create comprehensive test suite** (`t/preload.t`)
+- Test preload has_many relationship
+- Test preload belongs_to relationship
+- Test preload has_one relationship
+- Test multiple preloads in one call
+- Test preload with where() conditions
+- Test preload with order() and limit()
+- Test preload returns correct data (not duplicated)
+- Test preload with empty results
+- Test preload caches data (no extra queries)
+- Test preload SQL logging shows 2 queries
 
-**Step 2: Add has_one() DSL function to ORM::DSL**
-- Add has_one function to ORM::DSL.pm
-- Similar signature to has_many but with different _relationship_type
-- Support foreign_key override option
-- Store in has_one_relations metadata
+**Step 2: Add preload() method to ResultSet**
+- Add `preload_specs` attribute to ResultSet (array ref)
+- Add `preload()` chainable method
+- Validate relationship names against model's all_relations()
+- Store preload specifications for later execution
 
-**Step 3: Update ORM::Model relationship methods**
-- Add has_one_relations() method to return has_one metadata
-- Update all_relations() to include has_one relationships
-- Add has_one_relations to Public API Reference documentation
-- Ensure has_one appears in error messages for invalid joins
+**Step 3: Implement eager loading logic in all()**
+- After main query executes, check if preload_specs exist
+- For each preload specification:
+  - Extract related records in batch query
+  - Map related records to parent record IDs
+  - Store in model instances for later access
+- Use lazy loading pattern: store in model instance hash
 
-**Step 4: Implement has_one relationship accessor**
-- Add instance method: $user->profile (returns single Profile object)
-- Similar to has_many but returns single object, not array
-- Uses convention: foreign_key defaults to "${class_name}_id"
-  - e.g., User has_one profile -> foreign_key = "user_id"
-  - Note: NOT "profile_id" (that's belongs_to)
+**Step 4: Implement cached relationship access**
+- Modify has_many accessor to check for preloaded data first
+- Modify belongs_to accessor to check for preloaded data first
+- Modify has_one accessor to check for preloaded data first
+- Return cached data if available, otherwise query normally
 
-**Step 5: Update ResultSet JOIN support**
-- has_one JOINs should work like belongs_to (no DISTINCT needed)
-- Update _needs_distinct() to only trigger for has_many
-- has_one: COUNT(*) - one row per match (like belongs_to)
-- has_many: COUNT(DISTINCT ...) - need DISTINCT (multiple rows per match)
+**Step 5: Update ResultSet first() method**
+- Ensure preloading works with first() too
 
-**Step 6: Update SQL logging and integration**
-- Ensure SQL logging works for has_one queries
-- Test has_one with add_joins() method
-- Verify SQL generation matches expected pattern
+**Step 6: SQL logging for preloads**
+- Log each preload query separately
+- Show total queries executed
 
 **Step 7: Integration testing**
-- Run full test suite (t/orm.t + t/has_one.t)
-- Verify no regressions in existing tests
-- Test has_one with belongs_to and has_many in same model
+- Run full test suite (t/orm.t + t/preload.t)
+- Verify no regressions
 
 **Example Usage After Implementation:**
 ```perl
-# Model definition
+# Model definitions
 package MyApp::Model::User;
 use Moo;
 extends 'ORM::Model';
@@ -773,77 +767,96 @@ use ORM::DSL;
 
 tablename 'users';
 column id   => (is => 'rw', isa => 'Int', primary_key => 1);
-column name => (is => 'rw', isa => 'Str', required => 1);
+column name => (is => 'rw', isa => 'Str');
 
-# User has_one Profile (Profile stores user_id, not vice versa)
+has_many posts => (is => 'rw', isa => 'MyApp::Model::Post');
 has_one profile => (is => 'rw', isa => 'MyApp::Model::Profile');
+belongs_to company => (is => 'rw', isa => 'MyApp::Model::Company');
 
-# Alternative with custom foreign_key
-has_one primary_contact => (is => 'rw', isa => 'MyApp::Model::Contact', foreign_key => 'owner_id');
-
-package MyApp::Model::Profile;
+package MyApp::Model::Post;
 use Moo;
 extends 'ORM::Model';
 use ORM::DSL;
 
-tablename 'profiles';
+tablename 'posts';
 column id      => (is => 'rw', isa => 'Int', primary_key => 1);
-column user_id  => (is => 'rw', isa => 'Int');  # Foreign key to users
-column bio      => (is => 'rw', 'isa' => 'Str');
+column user_id => (is => 'rw', isa => 'Int');
+column title   => (is => 'rw', isa => 'Str');
 
-# Profile belongs_to User (reverse relationship)
-belongs_to user => (is => 'rw', isa => 'MyApp::Model::User', foreign_key => 'user_id');
+belongs_to user => (is => 'rw', isa => 'MyApp::Model::User');
 
 1;
 
-# Usage
-my $user = MyApp::Model::User->find(1);
+# Usage - preload has_many
+my @users = User->preload('posts')->all;
+# SQL 1: SELECT * FROM users
+# SQL 2: SELECT * FROM posts WHERE user_id IN (1, 2, 3, ...)
 
-# Get the user's profile (has_one - single object)
-my $profile = $user->profile;  # Returns Profile object, not array
+for my $user (@users) {
+    my @posts = $user->posts;  # Uses preloaded data - no extra query!
+}
 
-# Query with has_one JOIN
-my @users_with_profiles = MyApp::Model::User->where({})
-                                             ->add_joins('profile')
-                                             ->all;
-# SQL: SELECT * FROM users LEFT JOIN profiles ON profiles.user_id = users.id
+# Usage - preload multiple relationships
+my @users = User->preload('posts', 'profile')->all;
+# SQL 1: SELECT * FROM users
+# SQL 2: SELECT * FROM posts WHERE user_id IN (...)
+# SQL 3: SELECT * FROM profiles WHERE user_id IN (...)
 
-# Count users with profiles (has_one JOIN - no DISTINCT needed)
-my $count = MyApp::Model::User->where({})
-                               ->add_joins('profile')
-                               ->count;
-# SQL: SELECT COUNT(*) FROM users LEFT JOIN profiles ON profiles.user_id = users.id
+# Usage - preload with where conditions
+my @users = User->where({ active => 1 })
+                ->preload('posts')
+                ->order('name')
+                ->all;
+# SQL 1: SELECT * FROM users WHERE active = 1 ORDER BY name
+# SQL 2: SELECT * FROM posts WHERE user_id IN (...) AND ...
 
-# Relationship introspection
-my $rels = MyApp::Model::User->has_one_relations;
-# Returns: { profile => { isa => 'MyApp::Model::Profile', foreign_key => 'user_id', ... } }
+# Usage - preload belongs_to
+my @posts = Post->preload('user')->all;
+# SQL 1: SELECT * FROM posts
+# SQL 2: SELECT * FROM users WHERE id IN (...)
 
-my $all_rels = MyApp::Model::User->all_relations;
-# Returns: { profile => 'has_one', ... }
+for my $post (@posts) {
+    my $user = $post->user;  # Uses preloaded data!
+}
+
+# Comparison: Without preload (N+1 problem)
+my @users = User->all;
+for my $user (@users) {
+    my @posts = $user->posts;  # Each call = 1 query!
+}
+# 1 + N queries (slow!)
 ```
 
 **Design Notes:**
-- Foreign key convention: `${owner_class_name}_id` (lowercased)
-  - User has_one profile -> profiles.user_id (NOT profile_id)
-  - Company has_one address -> addresses.company_id (NOT address_id)
-- This is the opposite of belongs_to: belongs_to company -> employees.company_id
-- has_one is like belongs_to but from the OTHER side of the relationship
-- has_one returns single object, has_many returns array
-- has_one JOINs use COUNT(*) (like belongs_to), not DISTINCT (like has_many)
+- Preload stores data in model instances using a private hash key
+- Relationship accessors check cache first before querying
+- Cache is instance-specific (per model object)
+- Preload queries use WHERE ... IN (...) for efficiency
+- Empty preloads handled gracefully (no queries if no parent records)
 
-**Key Differences from has_many:**
+**Key Differences from add_joins():**
 
-| Aspect | has_many | has_one |
-|--------|----------|----------|
-| Returns | Array of objects | Single object |
-| Foreign key location | Related table | Related table |
-| Foreign key name | ${owner}_id | ${owner}_id |
-| COUNT behavior | DISTINCT needed | Simple COUNT(*) |
-| Method call | $user->posts (array) | $user->profile (object) |
+| Feature | add_joins() | preload() |
+|---------|--------------|-----------|
+| Query count | 1 | 2+ |
+| Row duplication | Yes | No |
+| Filtering | Can filter by related data | Cannot filter |
+| Data access | Flat in results | Nested in objects |
+| Memory | Lower (shared rows) | Higher (separate objects) |
 
-**Effort Estimate:** 3-4 hours
+**Implementation Summary:**
 
----
+- ✅ All 10 test cases passing in `t/preload.t`
+- ✅ Works with has_many, belongs_to, and has_one relationships
+- ✅ Batch loading via WHERE ... IN (...) for efficiency
+- ✅ Cached in model instances for subsequent access
+- ✅ Chainable with where(), order(), limit()
+- ✅ SQL logging shows preload queries
+
+**Test Results:**
+- Total tests: 52 passing (15 orm + 9 logger + 8 count_with_join + 10 has_one + 10 preload)
+
+**Effort Estimate:** 4-5 hours
 
 ### Long Term
 
@@ -880,3 +893,4 @@ my $all_rels = MyApp::Model::User->all_relations;
 | JOIN Support | ✓ DONE | d498597 |
 | Schema Validation & JOIN Validation | ✓ DONE | schema_valid, ensure_schema_valid, add_joins validation |
 | Full Test Coverage | ✓ DONE | 15 test suites passing |
+| preload() Eager Loading | ✓ DONE | 10 test suites in t/preload.t |

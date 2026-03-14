@@ -4,8 +4,13 @@
 use strict;
 use warnings;
 use experimental 'signatures';
-use Test2::V0;
+
+use FindBin;
+use File::Basename;
+use lib dirname($FindBin::Bin) . '/lib';
+
 use ORM::Logger;
+use Test2::V0;
 
 # Test ORM::Logger
 subtest 'ORM::Logger - Core Functionality' => sub {

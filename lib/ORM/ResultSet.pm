@@ -12,6 +12,7 @@ has 'order_by' => (is => 'rw', default => sub { [] });
 has 'limit_val' => (is => 'rw');
 has 'offset_val' => (is => 'rw');
 has 'join_specs' => (is => 'rw', default => sub { [] });
+has 'preload_specs' => (is => 'rw', default => sub { [] });
 
 has 'logger' => (is => 'lazy');
 sub _build_logger ($self) {
@@ -57,6 +58,12 @@ sub add_joins ($self, @relations) {
     return $self;
 }
 
+sub where ($self, $conditions = {}) {
+    # Merge conditions (simple replacement for now)
+    $self->conditions($conditions);
+    return $self;
+}
+
 sub order ($self, $order) {
     push @{$self->order_by}, $order;
     return $self;
@@ -69,6 +76,41 @@ sub limit ($self, $limit) {
 
 sub offset ($self, $offset) {
     $self->offset_val($offset);
+    return $self;
+}
+
+sub preload ($self, @relations) {
+    my $class = $self->class;
+
+    for my $rel (@relations) {
+        my $meta = $class->related_to($rel);
+        unless ($meta) {
+            my $class_name = ref $class || $class;
+            my $all_rels = $class->all_relations;
+
+            my $msg = "Invalid preload: '$class_name' has no"
+                    . " relationship named '$rel'\n";
+
+            if (keys %$all_rels) {
+                $msg .= "Available relationships:\n";
+                for my $name (sort keys %$all_rels) {
+                    $msg .= "  - $name ($all_rels->{$name})\n";
+                }
+            }
+            else {
+                $msg .= "$class_name has no defined"
+                       . " relationships.\n"
+                       . "Define relationships with"
+                       . " has_many, belongs_to, or has_one"
+                       . " in your model.\n";
+            }
+
+            die $msg;
+        }
+
+        push @{$self->preload_specs}, $rel;
+    }
+
     return $self;
 }
 
@@ -127,7 +169,149 @@ sub all ($self) {
     }
     $sth->finish;
 
+    # Eager loading: batch load related records for each preload spec
+    if (@{$self->preload_specs} && @rows) {
+        $self->_eager_load(\@rows);
+    }
+
     return wantarray ? @rows : \@rows;
+}
+
+sub _eager_load ($self, $rows) {
+    my $class = $self->class;
+    my $pk = $class->primary_key;
+
+    for my $rel_name (@{$self->preload_specs}) {
+        my $meta = $class->related_to($rel_name);
+        my $rel_class = $meta->{isa};
+        my $rel_type = $meta->{_relationship_type};
+        my $fk = $meta->{foreign_key} // '';
+
+        # Get parent PK values
+        my @parent_ids = grep { defined $_ } map { $_->$pk } @$rows;
+        next unless @parent_ids;
+
+        # Build the related records lookup
+        my %related_by_parent;
+
+        if ($rel_type eq 'has_many') {
+            # has_many: foreign key is on related table
+            my $fk = $meta->{foreign_key};
+            my $rel_table = $rel_class->table;
+
+            my $sql = "SELECT * FROM $rel_table WHERE $fk IN ("
+                    . join(',', ('?') x @parent_ids) . ")";
+
+            my $start = time();
+            my $sth = $class->db->dbh->prepare($sql);
+            $sth->execute(@parent_ids);
+            my $duration = (time() - $start) * 1000;
+
+            if ($ENV{ORM_SQL_LOGGING}) {
+                my $logger = ORM::Logger->new;
+                my $params_str = @parent_ids ? '[' . join(', ', @parent_ids) . ']' : '';
+                $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): PRELOAD $rel_name $sql $params_str");
+            }
+
+            while (my $row = $sth->fetchrow_hashref) {
+                my $rel_obj = $rel_class->new(%$row, db => $class->db);
+                my $parent_id = $row->{$fk};
+                push @{$related_by_parent{$parent_id}}, $rel_obj;
+            }
+            $sth->finish;
+        }
+        elsif ($rel_type eq 'has_one') {
+            # has_one: similar to has_many but returns only first
+            my $fk = $meta->{foreign_key};
+            my $rel_table = $rel_class->table;
+
+            my $sql = "SELECT * FROM $rel_table WHERE $fk IN ("
+                    . join(',', ('?') x @parent_ids) . ")";
+
+            # Add LIMIT 1 per parent to get only one record
+            # Actually, let's just get all and pick first per parent
+            $sql = "SELECT * FROM $rel_table WHERE $fk IN ("
+                    . join(',', ('?') x @parent_ids) . ")";
+
+            my $start = time();
+            my $sth = $class->db->dbh->prepare($sql);
+            $sth->execute(@parent_ids);
+            my $duration = (time() - $start) * 1000;
+
+            if ($ENV{ORM_SQL_LOGGING}) {
+                my $logger = ORM::Logger->new;
+                my $params_str = @parent_ids ? '[' . join(', ', @parent_ids) . ']' : '';
+                $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): PRELOAD $rel_name $sql $params_str");
+            }
+
+            while (my $row = $sth->fetchrow_hashref) {
+                my $rel_obj = $rel_class->new(%$row, db => $class->db);
+                my $parent_id = $row->{$fk};
+                # Store only first for has_one
+                $related_by_parent{$parent_id} //= $rel_obj;
+            }
+            $sth->finish;
+        }
+        elsif ($rel_type eq 'belongs_to') {
+            # belongs_to: foreign key is on local table
+            my $fk = $meta->{foreign_key};
+            
+            # Get unique foreign key values from parent rows
+            my @fk_values = grep { defined $_ } map { $_->$fk } @$rows;
+            next unless @fk_values;
+
+            my %unique_fk;
+            @unique_fk{@fk_values} = ();
+
+            my @rel_ids = sort keys %unique_fk;
+            my $rel_pk = $rel_class->primary_key;
+            my $rel_table = $rel_class->table;
+
+            my $sql = "SELECT * FROM $rel_table WHERE $rel_pk IN ("
+                    . join(',', ('?') x @rel_ids) . ")";
+
+            my $start = time();
+            my $sth = $class->db->dbh->prepare($sql);
+            $sth->execute(@rel_ids);
+            my $duration = (time() - $start) * 1000;
+
+            if ($ENV{ORM_SQL_LOGGING}) {
+                my $logger = ORM::Logger->new;
+                my $params_str = @rel_ids ? '[' . join(', ', @rel_ids) . ']' : '';
+                $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): PRELOAD $rel_name $sql $params_str");
+            }
+
+            my %rel_objs;
+            while (my $row = $sth->fetchrow_hashref) {
+                my $rel_obj = $rel_class->new(%$row, db => $class->db);
+                $rel_objs{$row->{$rel_pk}} = $rel_obj;
+            }
+            $sth->finish;
+
+            # Map to each parent
+            for my $parent (@$rows) {
+                my $fk_val = $parent->$fk;
+                $related_by_parent{$fk_val} = $rel_objs{$fk_val} if defined $fk_val;
+            }
+        }
+
+        # Store preloaded data in each parent object
+        for my $parent (@$rows) {
+            # Determine the key to use based on relationship type
+            my $lookup_key;
+            if ($rel_type eq 'belongs_to') {
+                # For belongs_to, the foreign key value maps to the related record
+                $lookup_key = $parent->$fk;
+            }
+            else {
+                # For has_many and has_one, use the parent's primary key
+                $lookup_key = $parent->$pk;
+            }
+            
+            my $key = "_preloaded_$rel_name";
+            $parent->{$key} = $related_by_parent{$lookup_key};
+        }
+    }
 }
 
 sub first ($self) {

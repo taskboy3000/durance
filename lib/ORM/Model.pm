@@ -241,6 +241,24 @@ sub first ($class) {
     return $class->where({})->first;
 }
 
+sub preload ($class, @relations) {
+    my $rs_class = _load_resultset();
+    my $rs = $rs_class->new(
+        class       => $class,
+        conditions  => {},
+        order_by    => [],
+        limit_val   => undef,
+        offset_val  => undef,
+        join_specs  => [],
+        preload_specs => [],
+    );
+    
+    # Validate and add preload specs
+    $rs->preload(@relations);
+    
+    return $rs;
+}
+
 # Mented to a called as a class method
 sub create ( $class, $data ) {
     my $dbh = $class->db->dbh;

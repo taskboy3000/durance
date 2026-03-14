@@ -6,9 +6,12 @@ use experimental 'signatures';
 use Test2::V0;
 use File::Temp qw(tempfile);
 use DBI;
+use FindBin;
+use File::Basename;
+
+use lib dirname($FindBin::Bin) . '/lib';
 
 # Import ORM modules
-use lib 'lib';
 require ORM::Model;
 require ORM::Schema;
 require ORM::DSL;

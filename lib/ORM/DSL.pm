@@ -164,6 +164,12 @@ sub load_into {
         $_has_many{$pkg}{$name}{foreign_key} = $foreign_key;
         
         *{"${pkg}::${name}"} = sub ($self) {
+            # Check for preloaded data first
+            my $key = "_preloaded_$name";
+            if (exists $self->{$key}) {
+                return $self->{$key};
+            }
+            
             my $model_class = $isa;
             my $fk = $foreign_key;
             my $pk = $self->primary_key;
@@ -218,6 +224,12 @@ sub load_into {
         
         # has_one accessor returns single object (not array like has_many)
         *{"${pkg}::${name}"} = sub ($self) {
+            # Check for preloaded data first
+            my $key = "_preloaded_$name";
+            if (exists $self->{$key}) {
+                return $self->{$key};
+            }
+            
             my $model_class = $isa;
             my $fk = $foreign_key;
             my $pk = $self->primary_key;
@@ -244,6 +256,12 @@ sub load_into {
         my $foreign_key = $opts{foreign_key} // "${name}_id";
         
         *{"${pkg}::${name}"} = sub ($self) {
+            # Check for preloaded data first
+            my $key = "_preloaded_$name";
+            if (exists $self->{$key}) {
+                return $self->{$key};
+            }
+            
             my $model_class = $isa;
             my $fk = $foreign_key;
             my $fk_val = $self->$fk;
