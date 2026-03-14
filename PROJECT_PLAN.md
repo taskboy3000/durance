@@ -1331,6 +1331,79 @@ subtest 'driver_from_dsn detection' => sub {
 
 ---
 
+### Task 29. Create Mojolicious::Plugin::Durance
+
+Package Durance integration as a reusable Mojolicious plugin for easier setup.
+
+**Objective:** Provide a standard plugin that eliminates boilerplate for Mojolicious + Durance
+integration.
+
+**Features:**
+- [ ] Auto-load models from MyApp::Model namespace
+- [ ] Configure database from Mojolicious config file
+- [ ] Optional helper: `$c->model('User')` returns `MyApp::Model::User`
+- [ ] Auto-migrate in development mode
+- [ ] Schema validation in production mode
+- [ ] Support environment-based configuration
+
+**Implementation Steps:**
+
+- [ ] **Step 1: Create plugin module**
+  - [ ] Create `lib/Mojolicious/Plugin/Durance.pm`
+  - [ ] Register as Mojolicious::Plugin
+  - [ ] Parse configuration from plugin options or config file
+
+- [ ] **Step 2: Model discovery and loading**
+  - [ ] Use `Durance::Schema->get_all_models_for_app()` to find models
+  - [ ] Require all discovered model classes
+  - [ ] Option to specify model namespaces explicitly
+
+- [ ] **Step 3: Schema management**
+  - [ ] Development mode: Call `migrate_all()` on startup
+  - [ ] Production mode: Call `ensure_schema_valid()` on all models
+  - [ ] Option to disable auto-migration
+
+- [ ] **Step 4: Optional helper**
+  - [ ] Add `model` helper: `$c->model('User')` → `MyApp::Model::User`
+  - [ ] Support short names and full class names
+  - [ ] Make helper optional (some users prefer direct model access)
+
+- [ ] **Step 5: Write tests**
+  - [ ] Test plugin registration
+  - [ ] Test model discovery
+  - [ ] Test schema migration in dev mode
+  - [ ] Test schema validation in prod mode
+  - [ ] Test helper functionality
+
+- [ ] **Step 6: Documentation**
+  - [ ] Add POD to plugin module
+  - [ ] Update README.md with plugin usage
+  - [ ] Show both plugin and non-plugin integration styles
+
+**Example Usage:**
+
+```perl
+# lib/MyApp.pm
+package MyApp;
+use Mojo::Base 'Mojolicious', -signatures;
+
+sub startup ($self) {
+    # Simple usage
+    $self->plugin('Durance');
+    
+    # Or with options
+    $self->plugin('Durance' => {
+        namespace => 'MyApp::Model',
+        migrate   => $self->mode eq 'development',
+        helper    => 'model',  # Add $c->model() helper
+    });
+}
+```
+
+**Estimated effort:** 4-6 hours
+
+---
+
 ### Task 26. Performance Testing
 
 Benchmark SQL queries and model operations.
