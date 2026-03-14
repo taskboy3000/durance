@@ -6,6 +6,7 @@ use experimental 'signatures';
 
 
 use Moo;
+use Time::HiRes qw(time);
 
 our %COLUMN_META;
 our ( %_columns, %_primary_key, 
@@ -14,6 +15,12 @@ our ( %_columns, %_primary_key,
 
 has primaryKey => (is => 'lazy');
 sub _build_primaryKey {'id'};
+
+has 'logger' => (is => 'lazy');
+sub _build_logger ($self) {
+    require ORM::Logger;
+    return ORM::Logger->new;
+}
 
 sub BUILD {
     my ($self, $args) = @_;
@@ -158,8 +165,16 @@ sub find ( $class, $id ) {
     my $dbh   = $class->db->dbh;
 
     my $stmt = "SELECT * FROM $table WHERE $pk = ?";
+    
+    my $start = time();
     my $sth  = $dbh->prepare($stmt);
     $sth->execute($id);
+    my $duration = (time() - $start) * 1000;
+    
+    if ($ENV{ORM_SQL_LOGGING}) {
+        my $logger = ORM::Logger->new;
+        $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $stmt [$id]");
+    }
 
     my $row = $sth->fetchrow_hashref;
     $sth->finish;
@@ -174,8 +189,16 @@ sub all ($class) {
     my $dbh   = $class->db->dbh;
 
     my $stmt = "SELECT * FROM $table";
+    
+    my $start = time();
     my $sth  = $dbh->prepare($stmt);
     $sth->execute;
+    my $duration = (time() - $start) * 1000;
+    
+    if ($ENV{ORM_SQL_LOGGING}) {
+        my $logger = ORM::Logger->new;
+        $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $stmt");
+    }
 
     my @rows;
     while ( my $row = $sth->fetchrow_hashref ) {
@@ -244,8 +267,18 @@ sub insert ($self) {
     my $col_list     = join ', ', @cols;
 
     my $stmt = "INSERT INTO $table ($col_list) VALUES ($placeholders)";
+    
+    my $start = time();
     my $sth  = $dbh->prepare($stmt);
     $sth->execute(@vals);
+    my $duration = (time() - $start) * 1000;
+    
+    if ($ENV{ORM_SQL_LOGGING}) {
+        my $logger = ORM::Logger->new;
+        my $params_str = '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @vals) . ']';
+        $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $stmt $params_str");
+    }
+    
     $sth->finish;
 
     my $pk = ref($self)->primary_key;
@@ -285,8 +318,19 @@ sub update ($self) {
     my $set_clause = join ', ', map {"$_ = ?"} @cols;
 
     my $stmt = "UPDATE $table SET $set_clause WHERE $pk = ?";
+    
+    my $start = time();
     my $sth  = $dbh->prepare($stmt);
     $sth->execute( @vals, $pk_val );
+    my $duration = (time() - $start) * 1000;
+    
+    if ($ENV{ORM_SQL_LOGGING}) {
+        my $logger = ORM::Logger->new;
+        my @all_params = (@vals, $pk_val);
+        my $params_str = '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @all_params) . ']';
+        $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $stmt $params_str");
+    }
+    
     $sth->finish;
 
     return $self;
@@ -300,8 +344,17 @@ sub delete ($self) {
     my $pk_val = $self->{$pk} // die "Cannot delete without primary key value";
 
     my $stmt = "DELETE FROM $table WHERE $pk = ?";
+    
+    my $start = time();
     my $sth  = $dbh->prepare($stmt);
     $sth->execute($pk_val);
+    my $duration = (time() - $start) * 1000;
+    
+    if ($ENV{ORM_SQL_LOGGING}) {
+        my $logger = ORM::Logger->new;
+        $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $stmt [$pk_val]");
+    }
+    
     $sth->finish;
 
     return $self;

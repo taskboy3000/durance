@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use experimental 'signatures';
 use Moo;
-
+use Time::HiRes qw(time);
 
 has 'class' => (is => 'ro', required => 1);
 has 'conditions' => (is => 'rw', default => sub { {} });
@@ -12,6 +12,12 @@ has 'order_by' => (is => 'rw', default => sub { [] });
 has 'limit_val' => (is => 'rw');
 has 'offset_val' => (is => 'rw');
 has 'join_specs' => (is => 'rw', default => sub { [] });
+
+has 'logger' => (is => 'lazy');
+sub _build_logger ($self) {
+    require ORM::Logger;
+    return ORM::Logger->new;
+}
 
 sub add_joins ($self, @relations) {
     my $class = $self->class;
@@ -178,8 +184,16 @@ sub all ($self) {
     }
     $sql .= " OFFSET " . $self->offset_val if defined $self->offset_val;
 
+    my $start = time();
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind_values);
+    my $duration = (time() - $start) * 1000;
+    
+    if ($ENV{ORM_SQL_LOGGING}) {
+        my $logger = ORM::Logger->new;
+        my $params_str = @bind_values ? '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @bind_values) . ']' : '';
+        $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $sql $params_str");
+    }
 
     my @rows;
     while ( my $row = $sth->fetchrow_hashref ) {
@@ -220,8 +234,17 @@ sub count ($self) {
     my $sql = "SELECT COUNT(*) FROM $table";
     $sql .= " WHERE " . join(' AND ', @where_parts) if @where_parts;
 
+    my $start = time();
     my $sth = $dbh->prepare($sql);
     $sth->execute(@bind_values);
+    my $duration = (time() - $start) * 1000;
+    
+    if ($ENV{ORM_SQL_LOGGING}) {
+        my $logger = ORM::Logger->new;
+        my $params_str = @bind_values ? '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @bind_values) . ']' : '';
+        $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $sql $params_str");
+    }
+    
     my ($count) = $sth->fetchrow_array;
     $sth->finish;
 

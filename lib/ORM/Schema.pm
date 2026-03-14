@@ -9,15 +9,17 @@ use Cwd;
 use FindBin;
 use File::Find;
 use Moo;
+use Time::HiRes qw(time);
 
 has 'dbh' => (is => 'rw');
 has 'model_class' => (is => 'rw');
 has 'driver' => (is => 'rw');
-has 'logger' => (is => 'ro', default => sub {
-    return sub (@messages) {
-        print STDERR scalar(localtime), "[$$]", join("\n", @messages), "\n";
-    };
-});
+has 'logger' => (is => 'lazy');
+
+sub _build_logger ($self) {
+    require ORM::Logger;
+    return ORM::Logger->new;
+}
 
 my %TYPE_MAP = (
     sqlite => {
@@ -190,7 +192,13 @@ sub create_table ( $self, $model ) {
     my $driver = $self->_detect_driver($dbh);
     my $sql    = $self->_build_create_table_sql($class, $driver);
 
+    my $start = time();
     $dbh->do($sql);
+    my $duration = (time() - $start) * 1000;
+    
+    if ($ENV{ORM_SQL_LOGGING}) {
+        $self->logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $sql");
+    }
 
     return 1;
 }
@@ -336,7 +344,7 @@ sub migrate ( $self, $model) {
 
     my $driver = $self->_detect_driver($dbh); # Is this needed?
 
-    $self->logger->("Migrating model '$class'");
+    $self->logger->log("Migrating model '$class'");
 
     # Does this table exist?
     if (!$self->table_exists($model)) {
@@ -363,7 +371,14 @@ sub migrate ( $self, $model) {
         if ( my $col_def = $self->_column_sql($attr, $type, $meta, $driver) )
         {
             my $sql = "ALTER TABLE $table ADD COLUMN $col_def";
+            
+            my $start = time();
             $dbh->do($sql);
+            my $duration = (time() - $start) * 1000;
+            
+            if ($ENV{ORM_SQL_LOGGING}) {
+                $self->logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $sql");
+            }
         }
     }
 
