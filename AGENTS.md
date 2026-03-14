@@ -7,7 +7,7 @@ This document provides guidelines for agents working on this codebase.
 - **Language**: Perl
 - **OO Framework**: Moo
 - **Database Access Framework**: DBI
-- **Supported Database**: SQLite3 and MariaDB
+- **Supported Database**: SQLite3
 - **Testing**: Test2::Suite
 - **Pending and Completed Project Tasks**: PROJECT_PLAN.md
 

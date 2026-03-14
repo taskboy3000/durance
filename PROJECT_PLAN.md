@@ -396,6 +396,30 @@ developer experience and catch errors early.
 
 ## Pending Tasks
 
+### 16. Prepare for GitHub Import
+
+Prepare the repository for publishing on GitHub.
+
+- [ ] Review repository for sensitive data (API keys, passwords)
+- [ ] Ensure .gitignore is complete
+- [ ] Add LICENSE file (Apache 2.0)
+- [ ] Add minimal README.md with installation and quick start
+- [ ] Verify all tests pass
+- [ ] Tag release version
+
+### 17. Add CPAN Distribution Files
+
+Create the files needed to upload this project to CPAN.
+
+- [ ] Create Build.PL or Makefile.PL
+- [ ] Update cpanfile with proper metadata
+- [ ] Add META.json/META.yml
+- [ ] Add perldoc footprint (LICENSE, AUTHOR, VERSION)
+- [ ] Test installation via `cpan .`
+- [ ] Register on PAUSE and request namespace (Durance::*)
+
+---
+
 ### 13. SQL Logging with Timing ✓ COMPLETED
 
 Implemented environment-variable-controlled SQL logging to STDERR for debugging
@@ -862,6 +886,7 @@ for my $user (@users) {
 
 | Feature | Description | Priority | Status |
 |---------|-------------|----------|--------|
+| MariaDB support | Add database driver support and tests for MariaDB | Low | Pending |
 | `many_to_many()` | Junction table relationships | Low | Pending |
 | `include()` | JOIN + record inflation for nested objects | Low | Pending |
 | Column aliasing | Handle column name collisions in JOINs | Low | Pending |
