@@ -4,6 +4,22 @@ A lightweight ActiveRecord-style ORM for Perl using Moo and DBI.
 
 ## Installation
 
+### From CPAN
+
+```bash
+cpan Durance
+```
+
+### From Source
+
+```bash
+perl Makefile.PL
+make
+make install
+```
+
+### Development Dependencies
+
 ```bash
 cpanm --installdeps .
 ```
