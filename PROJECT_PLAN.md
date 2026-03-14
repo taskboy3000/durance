@@ -38,11 +38,12 @@ ok 15 - Durance::Model - Basic attributes
 
 | Module | Status | Description |
 |--------|--------|-------------|
-| `lib/ORM/DSL.pm` | WORKING | DSL functions (column, tablename, has_many, belongs_to, validates) |
-| `lib/ORM/Model.pm` | WORKING | ActiveRecord-style base class with CRUD, relationships, JOINs |
-| `lib/ORM/DB.pm` | WORKING | Database connection management with handle pooling |
-| `lib/ORM/ResultSet.pm` | WORKING | Chainable query builder with JOIN support |
-| `lib/ORM/Schema.pm` | WORKING | Schema introspection, DDL generation, migration |
+| `lib/Durance/DSL.pm` | WORKING | DSL functions (column, tablename, has_many, belongs_to, has_one, validates) |
+| `lib/Durance/Model.pm` | WORKING | ActiveRecord-style base class with CRUD, relationships, JOINs |
+| `lib/Durance/DB.pm` | WORKING | Database connection management with handle pooling |
+| `lib/Durance/ResultSet.pm` | WORKING | Chainable query builder with JOIN support |
+| `lib/Durance/Schema.pm` | WORKING | Schema introspection, DDL generation, migration |
+| `lib/Durance/Logger.pm` | WORKING | SQL logging to STDERR |
 
 ---
 
@@ -378,17 +379,22 @@ developer experience and catch errors early.
 
 | File | Description |
 |------|-------------|
-| `lib/ORM/DSL.pm` | DSL functions for model definition |
-| `lib/ORM/Model.pm` | Base class for ORM models |
-| `lib/ORM/DB.pm` | Database connection management |
-| `lib/ORM/ResultSet.pm` | Chainable query builder |
-| `lib/ORM/Schema.pm` | Schema introspection and migration |
-| `lib/ORM/Logger.pm` | SQL logging to STDERR (to be created) |
-| `t/orm.t` | Comprehensive test suite (15 test suites) |
-| `t/logger.t` | SQL logging tests (to be created) |
+| `lib/Durance/DSL.pm` | DSL functions for model definition |
+| `lib/Durance/Model.pm` | Base class for ORM models |
+| `lib/Durance/DB.pm` | Database connection management |
+| `lib/Durance/ResultSet.pm` | Chainable query builder |
+| `lib/Durance/Schema.pm` | Schema introspection and migration |
+| `lib/Durance/Logger.pm` | SQL logging to STDERR |
+| `t/orm.t` | Comprehensive test suite |
+| `t/logger.t` | SQL logging tests |
+| `t/has_one.t` | has_one relationship tests |
+| `t/preload.t` | preload tests |
+| `t/count_with_join.t` | COUNT with JOIN tests |
 | `t/MyApp/DB.pm` | Test DB configuration |
 | `t/MyApp/Model/app/user.pm` | Test model (users table) |
 | `t/MyApp/Model/admin/role.pm` | Test model (roles table) |
+| `Makefile.PL` | CPAN distribution file |
+| `Makefile.dev` | Development Makefile |
 | `AGENTS.md` | Coding standards and guidelines |
 | `cpanfile` | Perl dependencies |
 
@@ -396,114 +402,105 @@ developer experience and catch errors early.
 
 ## Pending Tasks
 
-### 16. Prepare for GitHub Import
+### 18. many_to_many() Relationship Support
+
+Implement many-to-many relationships using junction tables.
+
+**Example Usage (desired API):**
+```perl
+# Models
+package MyApp::Model::Author;
+use Moo;
+extends 'Durance::Model';
+use Durance::DSL;
+
+tablename 'authors';
+column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+column name => (is => 'rw', isa => 'Str');
+
+many_to_many books => (
+    through => 'author_books',  # junction table
+    using  => 'book_id',       # foreign key in junction
+);
+
+package MyApp::Model::Book;
+use Moo;
+extends 'Durance::Model';
+use Durance::DSL;
+
+tablename 'books';
+column id    => (is => 'rw', isa => 'Int', primary_key => 1);
+column title => (is => 'rw', isa => 'Str');
+
+many_to_many authors => (
+    through => 'author_books',
+    using  => 'author_id',
+);
+
+# Usage
+my @books = $author->books;  # SELECT * FROM books ...
+my @authors = $book->authors; # SELECT * FROM authors ...
+```
+
+**Implementation Steps (DDT):**
+
+- [ ] **Step 1: Design the DSL syntax**
+  - [ ] Define `many_to_many` function in Durance::DSL
+  - [ ] Support `through` (junction table) parameter
+  - [ ] Support `using` (foreign key column) parameter
+  - [ ] Auto-derive junction table name if not provided
+
+- [ ] **Step 2: Add relationship metadata**
+  - [ ] Store `many_to_many` relationships in `%_many_to_many` package var
+  - [ ] Add `many_to_many_relations()` method to Durance::Model
+  - [ ] Update `all_relations()` to include many_to_many
+
+- [ ] **Step 3: Implement accessor method**
+  - [ ] Generate accessor method on model class
+  - [ ] Handle both directions (Author->books, Book->authors)
+  - [ ] Use EXISTS or JOIN query to fetch related records
+
+- [ ] **Step 4: Add preload support**
+  - [ ] Support preloading many_to_many relationships
+  - [ ] Use IN clause with collected IDs
+
+- [ ] **Step 5: Add create_related support**
+  - [ ] Allow creating new related records via junction table
+  - [ ] `create_book($author, { title => 'New Book' })` creates book and junction
+
+- [ ] **Step 6: Write tests**
+  - [ ] Create test models (Author, Book, AuthorBook)
+  - [ ] Test basic many_to_many access
+  - [ ] Test bidirectional access
+  - [ ] Test with where conditions
+  - [ ] Test preload support
+
+- [ ] **Step 7: Update documentation**
+  - [ ] Add many_to_many to DSL documentation
+  - [ ] Update README with example
+
+---
+
+### 16. Prepare for GitHub Import ✓ COMPLETED
 
 Prepare the repository for publishing on GitHub.
 
-- [ ] Review repository for sensitive data (API keys, passwords)
-- [ ] Ensure .gitignore is complete
-- [ ] Add LICENSE file (Apache 2.0)
-- [ ] Add minimal README.md with installation and quick start
-- [ ] Verify all tests pass
-- [ ] Tag release version
+- [x] Review repository for sensitive data (API keys, passwords)
+- [x] Ensure .gitignore is complete
+- [x] Add LICENSE file
+- [x] Add minimal README.md with installation and quick start
+- [x] Verify all tests pass
+- [x] Push to GitHub
 
-### 17. Add CPAN Distribution Files
+### 17. Add CPAN Distribution Files ✓ COMPLETED
 
 Create the files needed to upload this project to CPAN.
 
-- [ ] Create Build.PL or Makefile.PL
-- [ ] Update cpanfile with proper metadata
-- [ ] Add META.json/META.yml
-- [ ] Add perldoc footprint (LICENSE, AUTHOR, VERSION)
-- [ ] Test installation via `cpan .`
-- [ ] Register on PAUSE and request namespace (Durance::*)
-
-**Detailed Implementation Plan:**
-
-**Step 1: Add VERSION and proper POD to each module**
-- Add `$VERSION = '0.01';` to each Durance::* module
-- Add standard POD header: `=head1 NAME`, `=head1 VERSION`, `=head1 DESCRIPTION`, `=head1 AUTHOR`, `=head1 LICENSE`
-- Example:
-  ```perl
-  our $VERSION = '0.01';
-  
-  1;
-  =pod
-  
-  =head1 NAME
-  
-  Durance::Model - ActiveRecord-style ORM base class
-  
-  =head1 VERSION
-  
-  Version 0.01
-  
-  =head1 AUTHOR
-  
-  Joe Johnston <jjohn@taskboy.com>
-  
-  =head1 LICENSE
-  
-  Perl Artistic License
-  
-  =cut
-  ```
-
-**Step 2: Create Makefile.PL**
-- Use ExtUtils::MakeMaker or Module::Build
-- Define PREREQ_PM (runtime dependencies)
-- Define TEST_REQUIRES (test dependencies)
-- Set VERSION_FROM to extract version from lib/Durance/Model.pm
-- Set LICENSE to 'perl'
-- Example:
-  ```perl
-  use ExtUtils::MakeMaker;
-  
-  WriteMakefile(
-      NAME              => 'Durance',
-      VERSION_FROM      => 'lib/Durance/Model.pm',
-      AUTHOR            => 'Joe Johnston <jjohn@taskboy.com>',
-      ABSTRACT          => 'Lightweight ActiveRecord-style ORM',
-      LICENSE           => 'perl',
-      PREREQ_PM         => {
-          'Moo'          => 0,
-          'DBI'          => 0,
-          'DBD::SQLite'  => 0,
-      },
-      TEST_REQUIRES     => {
-          'Test2::Suite' => 0,
-      },
-      META_MERGE        => {
-          'meta-spec' => 2,
-          resources    => {
-              repository => {
-                  type => 'git',
-                  url  => 'https://github.com/taskboy3000/durance.git',
-              },
-          },
-      },
-  );
-  ```
-
-**Step 3: Update cpanfile**
-- Remove App::cpanminus (not needed for distribution)
-- Add File::Spec (core, no need to specify)
-- Keep only runtime and test deps
-
-**Step 4: Create META.json (optional)**
-- Will be generated by Makefile.PL
-- Can manually add for immediate use
-
-**Step 5: Test installation**
-- Run `perl Makefile.PL`
-- Run `make install`
-- Or test via `cpan .`
-
-**Step 6: Register PAUSE namespace**
-- Go to https://pause.perl.org/
-- Create account if needed
-- Request upload permission for Durance::*
-- Upload distribution via PAUSE
+- [x] Create Makefile.PL
+- [x] Update cpanfile with proper metadata
+- [x] Add META.json/META.yml
+- [x] Add perldoc footprint (LICENSE, AUTHOR, VERSION)
+- [x] Test installation via `perl Makefile.PL && make install`
 
 ---
 
@@ -974,7 +971,6 @@ for my $user (@users) {
 | Feature | Description | Priority | Status |
 |---------|-------------|----------|--------|
 | MariaDB support | Add database driver support and tests for MariaDB | Low | Pending |
-| `many_to_many()` | Junction table relationships | Low | Pending |
 | `include()` | JOIN + record inflation for nested objects | Low | Pending |
 | Column aliasing | Handle column name collisions in JOINs | Low | Pending |
 | Performance testing | Benchmark SQL queries and model operations | Low | Pending |
