@@ -677,9 +677,173 @@ modules.
 
 | Feature | Description | Priority | Status |
 |---------|-------------|----------|--------|
+| `has_one()` | One-to-one relationship support | Medium | ⏸️ IN PROGRESS |
 | `preload()` | Eager loading (2 queries, avoids N+1) | Medium | Pending |
-| `has_one()` | One-to-one relationship support | Medium | Pending |
 | COUNT with JOIN | Special handling for COUNT queries with JOINs | Medium | ✓ COMPLETED |
+
+### 16. has_one() - IN PROGRESS
+
+Implement one-to-one relationship support. This is similar to belongs_to but represents 
+a different relationship pattern where the OTHER model stores the foreign key.
+
+**Problem:**
+- Currently, only has_many and belongs_to relationships exist
+- No support for one-to-one relationships (User has_one Profile)
+- Different semantics needed: has_one returns single object, not array
+
+**Understanding has_one vs belongs_to:**
+- `belongs_to`: "I belong to something" - I store the foreign key
+  - Example: `Employee belongs_to Company` - employees.company_id stores the relationship
+  - Employee record knows which Company it belongs to
+- `has_one`: "I have one of something" - the OTHER model stores MY id
+  - Example: `User has_one Profile` - profiles.user_id stores the relationship
+  - Profile knows which User it belongs to; User queries Profile by that user_id
+  - Returns a single related object, not an array
+
+**Requirements:**
+- ✅ Add `has_one()` DSL function to ORM::DSL
+- ✅ Add `_relationship_type` metadata tag for has_one
+- ✅ Update `all_relations()` to recognize has_one relationships
+- ✅ Add `has_one_relations()` introspection method to ORM::Model
+- ✅ has_one should work with JOIN queries (like belongs_to)
+- ✅ Support relationship accessor method (User->profile returns Profile)
+- ✅ SQL logging support (via ORM::Logger)
+- ✅ Support foreign_key override (like belongs_to)
+- ✅ Integration with existing has_many and belongs_to
+- ✅ No breaking changes to existing API
+
+**Test-Driven Development Implementation Plan:**
+
+**Step 1: Create comprehensive test suite** (`t/has_one.t`)
+- Test has_one relationship definition in model
+- Test has_one_relations() introspection method
+- Test has_one with belongs_to in same model
+- Test has_one with has_many in same model
+- Test has_one relationship accessor (instance method)
+- Test has_one with add_joins() in ResultSet
+- Test has_one foreign_key override
+- Test has_one SQL generation (similar to belongs_to)
+- Test has_one with SQL logging
+- Test has_one with WHERE conditions
+- Test multiple has_one relationships
+- Test has_one returns single object (not array)
+
+**Step 2: Add has_one() DSL function to ORM::DSL**
+- Add has_one function to ORM::DSL.pm
+- Similar signature to has_many but with different _relationship_type
+- Support foreign_key override option
+- Store in has_one_relations metadata
+
+**Step 3: Update ORM::Model relationship methods**
+- Add has_one_relations() method to return has_one metadata
+- Update all_relations() to include has_one relationships
+- Add has_one_relations to Public API Reference documentation
+- Ensure has_one appears in error messages for invalid joins
+
+**Step 4: Implement has_one relationship accessor**
+- Add instance method: $user->profile (returns single Profile object)
+- Similar to has_many but returns single object, not array
+- Uses convention: foreign_key defaults to "${class_name}_id"
+  - e.g., User has_one profile -> foreign_key = "user_id"
+  - Note: NOT "profile_id" (that's belongs_to)
+
+**Step 5: Update ResultSet JOIN support**
+- has_one JOINs should work like belongs_to (no DISTINCT needed)
+- Update _needs_distinct() to only trigger for has_many
+- has_one: COUNT(*) - one row per match (like belongs_to)
+- has_many: COUNT(DISTINCT ...) - need DISTINCT (multiple rows per match)
+
+**Step 6: Update SQL logging and integration**
+- Ensure SQL logging works for has_one queries
+- Test has_one with add_joins() method
+- Verify SQL generation matches expected pattern
+
+**Step 7: Integration testing**
+- Run full test suite (t/orm.t + t/has_one.t)
+- Verify no regressions in existing tests
+- Test has_one with belongs_to and has_many in same model
+
+**Example Usage After Implementation:**
+```perl
+# Model definition
+package MyApp::Model::User;
+use Moo;
+extends 'ORM::Model';
+use ORM::DSL;
+
+tablename 'users';
+column id   => (is => 'rw', isa => 'Int', primary_key => 1);
+column name => (is => 'rw', isa => 'Str', required => 1);
+
+# User has_one Profile (Profile stores user_id, not vice versa)
+has_one profile => (is => 'rw', isa => 'MyApp::Model::Profile');
+
+# Alternative with custom foreign_key
+has_one primary_contact => (is => 'rw', isa => 'MyApp::Model::Contact', foreign_key => 'owner_id');
+
+package MyApp::Model::Profile;
+use Moo;
+extends 'ORM::Model';
+use ORM::DSL;
+
+tablename 'profiles';
+column id      => (is => 'rw', isa => 'Int', primary_key => 1);
+column user_id  => (is => 'rw', isa => 'Int');  # Foreign key to users
+column bio      => (is => 'rw', 'isa' => 'Str');
+
+# Profile belongs_to User (reverse relationship)
+belongs_to user => (is => 'rw', isa => 'MyApp::Model::User', foreign_key => 'user_id');
+
+1;
+
+# Usage
+my $user = MyApp::Model::User->find(1);
+
+# Get the user's profile (has_one - single object)
+my $profile = $user->profile;  # Returns Profile object, not array
+
+# Query with has_one JOIN
+my @users_with_profiles = MyApp::Model::User->where({})
+                                             ->add_joins('profile')
+                                             ->all;
+# SQL: SELECT * FROM users LEFT JOIN profiles ON profiles.user_id = users.id
+
+# Count users with profiles (has_one JOIN - no DISTINCT needed)
+my $count = MyApp::Model::User->where({})
+                               ->add_joins('profile')
+                               ->count;
+# SQL: SELECT COUNT(*) FROM users LEFT JOIN profiles ON profiles.user_id = users.id
+
+# Relationship introspection
+my $rels = MyApp::Model::User->has_one_relations;
+# Returns: { profile => { isa => 'MyApp::Model::Profile', foreign_key => 'user_id', ... } }
+
+my $all_rels = MyApp::Model::User->all_relations;
+# Returns: { profile => 'has_one', ... }
+```
+
+**Design Notes:**
+- Foreign key convention: `${owner_class_name}_id` (lowercased)
+  - User has_one profile -> profiles.user_id (NOT profile_id)
+  - Company has_one address -> addresses.company_id (NOT address_id)
+- This is the opposite of belongs_to: belongs_to company -> employees.company_id
+- has_one is like belongs_to but from the OTHER side of the relationship
+- has_one returns single object, has_many returns array
+- has_one JOINs use COUNT(*) (like belongs_to), not DISTINCT (like has_many)
+
+**Key Differences from has_many:**
+
+| Aspect | has_many | has_one |
+|--------|----------|----------|
+| Returns | Array of objects | Single object |
+| Foreign key location | Related table | Related table |
+| Foreign key name | ${owner}_id | ${owner}_id |
+| COUNT behavior | DISTINCT needed | Simple COUNT(*) |
+| Method call | $user->posts (array) | $user->profile (object) |
+
+**Effort Estimate:** 3-4 hours
+
+---
 
 ### Long Term
 

@@ -6,7 +6,7 @@ use experimental 'signatures';
 
 
 # Package variables from ORM::Model that we need to access
-our ( %_has_many, %_belongs_to, %_validations );
+our ( %_has_many, %_has_one, %_belongs_to, %_validations );
 
 =pod
 
@@ -186,6 +186,47 @@ sub load_into {
             my %data = @args == 1 && ref $args[0] eq 'HASH' ? %{$args[0]} : @args;
             $data{$foreign_key} = $pk_val;
             return $model_class->create(\%data);
+        };
+        
+        return;
+    };
+
+    # Export has_one function
+    *{"${caller}::has_one"} = sub ($name, %opts) {
+        my $pkg = caller;
+
+        # Store in has_one registry
+        $_has_one{$pkg}{$name} = \%opts;
+        
+        # Tag with relationship type
+        $_has_one{$pkg}{$name}{_relationship_type} = 'has_one';
+        
+        my $isa = $opts{isa};
+        my $foreign_key = $opts{foreign_key};
+        
+        unless ($foreign_key) {
+            # Default foreign key is derived from the parent class's singular name
+            # e.g., User has_one profile -> profiles.user_id
+            # Extract short name from package: MyApp::Model::User -> User -> user
+            my $parent_name = $pkg;
+            $parent_name =~ s/.+::(.+?)$/$1/;
+            $parent_name = lc($parent_name);
+            $foreign_key = "${parent_name}_id";
+        }
+        
+        $_has_one{$pkg}{$name}{foreign_key} = $foreign_key;
+        
+        # has_one accessor returns single object (not array like has_many)
+        *{"${pkg}::${name}"} = sub ($self) {
+            my $model_class = $isa;
+            my $fk = $foreign_key;
+            my $pk = $self->primary_key;
+            my $pk_val = $self->$pk;
+            
+            return undef unless defined $pk_val;
+            
+            # Return single object (not array like has_many)
+            return $model_class->where({ $fk => $pk_val })->first;
         };
         
         return;
