@@ -361,6 +361,38 @@ developer experience and catch errors early.
 
 ---
 
+## Testing Guidelines
+
+### Git Commit Guidelines
+
+- **NEVER run `git commit` without explicitly prompting the user for permission first**
+- Always ask the user before committing, even if the change seems small
+- The user prefers to review and potentially squash commits that represent too little work
+- When asking for permission, provide a brief summary of what will be committed
+
+### Test File Template
+
+All new test files must include the following at the top to ensure they work with both `prove` and `perl -Ilib`:
+
+```perl
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use experimental 'signatures';
+
+use File::Basename;
+use FindBin;
+BEGIN {
+    $::PROJ_ROOT = dirname($FindBin::Bin);
+}
+
+use lib ("$::PROJ_ROOT/lib", "$::PROJ_ROOT/t");
+
+use Test2::V0;
+```
+
+---
+
 ## Key Architecture Decisions
 
 | Decision | Rationale |
