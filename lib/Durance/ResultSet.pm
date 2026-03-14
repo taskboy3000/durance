@@ -114,6 +114,50 @@ sub preload ($self, @relations) {
     return $self;
 }
 
+sub _get_aliased_columns ($self) {
+    my $class = $self->class;
+    my $main_table = $class->table;
+    my @col_specs;
+    
+    # Main table columns with alias
+    my $main_cols = $class->columns;
+    for my $col (@$main_cols) {
+        push @col_specs, "$main_table.$col AS ${main_table}__$col";
+    }
+    
+    # Add columns from joined tables with aliases
+    for my $rel (@{$self->join_specs}) {
+        my ($rel_name, $rel_opts);
+        
+        if (ref $rel eq 'HASH') {
+            ($rel_name, $rel_opts) = %$rel;
+        }
+        else {
+            $rel_name = $rel;
+            $rel_opts = {};
+        }
+        
+        my $meta = $class->related_to($rel_name);
+        
+        if ($meta && ref $meta eq 'HASH') {
+            my $related_class = $meta->{isa};
+            my $related_table = $related_class->table;
+            
+            my $rel_cols = $related_class->columns;
+            for my $col (@$rel_cols) {
+                push @col_specs, "$related_table.$col AS ${related_table}__$col";
+            }
+        }
+        elsif ($rel_opts && $rel_opts->{table}) {
+            # For explicit overrides, just add the table without aliasing
+            # User must handle column collisions themselves
+            push @col_specs, "$rel_opts->{table}.*";
+        }
+    }
+    
+    return wantarray ? @col_specs : \@col_specs;
+}
+
 sub all ($self) {
     my $class = $self->class;
     my $table = $class->table;
@@ -136,7 +180,16 @@ sub all ($self) {
         }
     }
 
-    my $sql = "SELECT * FROM $table";
+    # Use aliased columns if we have JOINs
+    my $columns_str;
+    if (@{$self->join_specs}) {
+        my @columns = $self->_get_aliased_columns();
+        $columns_str = join(', ', @columns);
+    }
+    else {
+        $columns_str = '*';
+    }
+    my $sql = "SELECT $columns_str FROM $table";
 
     # Build JOIN clauses
     my @join_parts = $self->_build_join_sql();
@@ -164,8 +217,25 @@ sub all ($self) {
     }
 
     my @rows;
+    my $main_table = $class->table;
     while ( my $row = $sth->fetchrow_hashref ) {
-        push @rows, $class->new(%$row, db => $class->db);
+        # If we have JOINs, we need to map aliased columns back to original names
+        # Format: tablename__columnname -> columnname
+        if (@{$self->join_specs}) {
+            my %mapped_row;
+            for my $key (keys %$row) {
+                if ($key =~ /^${main_table}__(.+)$/) {
+                    $mapped_row{$1} = $row->{$key};
+                }
+                else {
+                    $mapped_row{$key} = $row->{$key};
+                }
+            }
+            push @rows, $class->new(%mapped_row, db => $class->db);
+        }
+        else {
+            push @rows, $class->new(%$row, db => $class->db);
+        }
     }
     $sth->finish;
 

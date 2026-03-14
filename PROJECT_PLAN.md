@@ -987,6 +987,65 @@ for my $user (@users) {
 | Column aliasing | Handle column name collisions in JOINs | Low | Pending |
 | Performance testing | Benchmark SQL queries and model operations | Low | Pending |
 
+---
+
+### 21. Column Aliasing for JOINs ✓ COMPLETED
+
+Handle column name collisions when JOINing tables that share column names (e.g., `id`, `name`).
+
+**Problem:**
+- When doing `User->add_joins('company')->all`, if both tables have an `id` column, the second overwrites the first
+- `SELECT *` returns only one `id` column in the hash
+
+**Solution:**
+- Generate aliased column names: `users.id AS users__id`, `companies.id AS companies__id`
+- Parse aliased column names when building model objects
+- Map `users__id` back to `id` for the User model, `companies__id` for Company model
+
+**Implementation Steps (DDT):**
+
+- [x] **Step 1: Analyze current JOIN SQL generation**
+  - [x] Review `_build_join_sql` in ResultSet
+  - [x] Identify where `SELECT *` is used
+
+- [x] **Step 2: Design column aliasing strategy**
+  - [x] Define alias format: `table__column`
+  - [x] Update ResultSet to generate aliased SELECT
+  - [x] Handle existing column specification (not just `*`)
+
+- [x] **Step 3: Add column aliasing to ResultSet**
+  - [x] Add method to collect all columns from main + joined tables
+  - [x] Generate aliased column list
+  - [x] Replace `SELECT *` with aliased columns
+
+- [x] **Step 4: Parse aliased columns when building objects**
+  - [x] Add column mapping logic in ResultSet::all()
+  - [x] Split aliased names back to table.column
+  - [x] Assign to correct model object
+
+- [x] **Step 5: Write tests**
+  - [x] Create test with JOIN that has colliding column names
+  - [x] Verify both columns are accessible
+  - [x] Test with belongs_to and has_many JOINs
+
+- [x] **Step 6: Update documentation**
+  - [x] Document column aliasing behavior
+
+**Test Results:**
+- All 39 tests passing (7 test files)
+
+**Example Usage:**
+```perl
+# User and Company both have 'id' and 'name' columns
+User->add_joins('company')->all;
+
+# With aliasing:
+# $user->id        # user's id (from users.id)
+# $user->name     # user's name (from users.name)
+# $user->company->id    # company's id (from companies.id)
+# $user->company->name # company's name (from companies.name)
+```
+
 ### Deferred Features
 
 | Feature | Description | Priority | Reason |
