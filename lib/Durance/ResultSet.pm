@@ -220,16 +220,21 @@ sub all ($self) {
     my $main_table = $class->table;
     while ( my $row = $sth->fetchrow_hashref ) {
         # If we have JOINs, we need to map aliased columns back to original names
-        # Format: tablename__columnname -> columnname
+        # Format: tablename__columnname -> columnname for main table only
+        #
+        # NOTE: Joined table columns (e.g., companies__name) are intentionally NOT
+        # stored in the parent object. They are dropped by the Model's BUILD hook
+        # which only copies defined columns. Related data is accessed via relationship
+        # methods (e.g., $employee->company->name) rather than directly from the
+        # JOIN result. This keeps the object clean and avoids data duplication.
         if (@{$self->join_specs}) {
             my %mapped_row;
             for my $key (keys %$row) {
                 if ($key =~ /^${main_table}__(.+)$/) {
                     $mapped_row{$1} = $row->{$key};
                 }
-                else {
-                    $mapped_row{$key} = $row->{$key};
-                }
+                # Else: joined table columns (companies__name, etc.) are discarded
+                # They're not needed since we use relationship accessors
             }
             push @rows, $class->new(%mapped_row, db => $class->db);
         }

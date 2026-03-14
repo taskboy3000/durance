@@ -129,6 +129,34 @@ subtest 'Column aliasing - both columns accessible' => sub {
     }
 };
 
+subtest 'Column aliasing - joined columns NOT stored in parent object' => sub {
+    # Joined table columns are intentionally NOT stored in the parent object hash.
+    # This is by design because:
+    # 1. Related data is accessed via relationship methods ($employee->company->name)
+    # 2. Only the foreign key (company_id) is needed for the relationship
+    # 3. The main table columns are unmapped (employees__id -> id)
+    
+    my @emps = MyApp::Model::Employee->where({})
+        ->add_joins('company')
+        ->all;
+
+    my $alice = (grep { $_->id == 1 } @emps)[0];
+    
+    # Main table columns are unmapped: employees__name -> name
+    ok(exists $alice->{name}, 'main table column name exists (unmapped from employees__name)');
+    is($alice->{name}, 'Alice', 'main table name is Alice');
+    
+    # Joined table columns are intentionally NOT stored in parent object
+    # They are dropped by the BUILD hook which only copies defined columns
+    ok(!exists $alice->{'companies__name'}, 'joined table column NOT stored in parent (by design)');
+    ok(!exists $alice->{'companies__id'}, 'joined table id NOT stored in parent (by design)');
+    
+    # But the relationship accessor works correctly
+    my $company = $alice->company;
+    ok($company, 'company relationship works');
+    is($company->name, 'Acme Corp', 'company accessed via relationship');
+};
+
 $db->disconnect_all;
 
 unlink $db_path if -e $db_path;

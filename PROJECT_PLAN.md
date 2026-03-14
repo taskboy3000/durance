@@ -1046,6 +1046,24 @@ User->add_joins('company')->all;
 # $user->company->name # company's name (from companies.name)
 ```
 
+---
+
+### 22. Document and Test Joined Column Alias Behavior ✓ COMPLETED
+
+The current column aliasing implementation handles the main table columns correctly
+(employees__id -> id), but joined table columns (e.g., companies__name) are intentionally
+NOT stored in the parent object.
+
+This is by design since:
+- Related objects are loaded via the preload mechanism, not from JOIN results
+- The BUILD hook only copies defined columns, discarding unknown keys
+- Relationship accessors ($employee->company->name) provide the correct data
+
+- [x] Add test to verify joined columns are NOT stored in parent object
+- [x] Document this behavior in code comments
+
+---
+
 ### Deferred Features
 
 | Feature | Description | Priority | Reason |
