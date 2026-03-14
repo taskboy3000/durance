@@ -20,6 +20,23 @@ sub _build_logger ($self) {
     return Durance::Logger->new;
 }
 
+has 'query_builder' => (is => 'lazy');
+sub _build_query_builder ($self) {
+    require Durance::QueryBuilder;
+    my $class = $self->class;
+    my $driver = 'SQLite';
+    
+    if ($class->can('db')) {
+        my $db = eval { $class->db };
+        if ($db && $db->can('dsn')) {
+            my $qb = Durance::QueryBuilder->new(class => $class);
+            $driver = $qb->driver_from_dsn($db->dsn);
+        }
+    }
+    
+    return Durance::QueryBuilder->new(class => $class, driver => $driver);
+}
+
 sub add_joins ($self, @relations) {
     my $class = $self->class;
 
@@ -163,78 +180,34 @@ sub all ($self) {
     my $table = $class->table;
     my $dbh   = $class->db->dbh;
 
-    my @where_parts;
-    my @bind_values;
-
-    for my $col (keys %{$self->conditions}) {
-        my $val = $self->conditions->{$col};
-        if (ref $val eq 'HASH') {
-            for my $op (keys %$val) {
-                push @where_parts, "$col $op ?";
-                push @bind_values, $val->{$op};
-            }
-        }
-        else {
-            push @where_parts, "$col = ?";
-            push @bind_values, $val;
-        }
-    }
-
-    # Use aliased columns if we have JOINs
-    my $columns_str;
-    if (@{$self->join_specs}) {
-        my @columns = $self->_get_aliased_columns();
-        $columns_str = join(', ', @columns);
-    }
-    else {
-        $columns_str = '*';
-    }
-    my $sql = "SELECT $columns_str FROM $table";
-
-    # Build JOIN clauses
-    my @join_parts = $self->_build_join_sql();
-    $sql .= " " . join(' ', @join_parts) if @join_parts;
-
-    $sql .= " WHERE " . join(' AND ', @where_parts) if @where_parts;
-    $sql .= " ORDER BY " . join(', ', @{$self->order_by}) if @{$self->order_by};
-    if (defined $self->limit_val) {
-        $sql .= " LIMIT " . $self->limit_val;
-    }
-    elsif (defined $self->offset_val) {
-        $sql .= " LIMIT 1000000";
-    }
-    $sql .= " OFFSET " . $self->offset_val if defined $self->offset_val;
+    my ($sql, $bind_values) = $self->query_builder->build_select({
+        conditions => $self->conditions,
+        order_by   => $self->order_by,
+        limit_val  => $self->limit_val,
+        offset_val => $self->offset_val,
+        join_specs => $self->join_specs,
+    });
 
     my $start = time();
     my $sth = $dbh->prepare($sql);
-    $sth->execute(@bind_values);
+    $sth->execute(@$bind_values);
     my $duration = (time() - $start) * 1000;
     
     if ($ENV{ORM_SQL_LOGGING}) {
         my $logger = Durance::Logger->new;
-        my $params_str = @bind_values ? '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @bind_values) . ']' : '';
+        my $params_str = @$bind_values ? '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @$bind_values) . ']' : '';
         $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $sql $params_str");
     }
 
     my @rows;
     my $main_table = $class->table;
     while ( my $row = $sth->fetchrow_hashref ) {
-        # If we have JOINs, we need to map aliased columns back to original names
-        # Format: tablename__columnname -> columnname for main table only
-        #
-        # NOTE: Joined table columns (e.g., companies__name) are intentionally NOT
-        # stored in the parent object. They are dropped by the Model's BUILD hook
-        # which only copies defined columns. Related data is accessed via relationship
-        # methods (e.g., $employee->company->name) rather than directly from the
-        # JOIN result. This keeps the object clean and avoids data duplication.
         if (@{$self->join_specs}) {
             my %mapped_row;
             for my $key (keys %$row) {
                 if ($key =~ /^${main_table}__(.+)$/) {
                     $mapped_row{$1} = $row->{$key};
                 }
-                # Else: joined table columns (companies__name, etc.) are discarded
-                # They're not needed since we use relationship accessors
             }
             push @rows, $class->new(%mapped_row, db => $class->db);
         }
@@ -244,7 +217,6 @@ sub all ($self) {
     }
     $sth->finish;
 
-    # Eager loading: batch load related records for each preload spec
     if (@{$self->preload_specs} && @rows) {
         $self->_eager_load(\@rows);
     }
@@ -429,151 +401,30 @@ sub first ($self) {
 }
 
 sub _build_join_sql ($self) {
-    my $class = $self->class;
-    my $table = $class->table;
-    my @join_parts;
-
-    for my $rel (@{$self->join_specs}) {
-        my ($rel_name, $rel_opts);
-
-        if (ref $rel eq 'HASH') {
-            ($rel_name, $rel_opts) = %$rel;
-        }
-        else {
-            $rel_name = $rel;
-            $rel_opts = {};
-        }
-
-        # Look up relationship metadata
-        my $meta = $class->related_to($rel_name);
-
-        # If no metadata found and it's a hash override, use explicit settings
-        if ($meta && ref $meta eq 'HASH') {
-            # Determine JOIN type (default LEFT)
-            my $join_type = $rel_opts->{type} // 'LEFT';
-
-            # Determine tables and keys
-            my $related_class = $meta->{isa};
-            my $related_table = $related_class->table;
-            my $local_pk = $class->primary_key;
-            my $local_table = $table;
-
-            # Skip if this table is already joined (avoid duplicates)
-            my $already_joined = 0;
-            for my $existing (@join_parts) {
-                if ($existing =~ /\b$related_table\b/) {
-                    $already_joined = 1;
-                    last;
-                }
-            }
-            next if $already_joined;
-
-            # Build ON clause based on relationship type
-            my $on_clause;
-            if ($meta->{_relationship_type} eq 'belongs_to') {
-                # belongs_to: foreign key is on local table
-                # e.g., Employee belongs_to Company: employees.company_id = companies.id
-                my $foreign_key = $meta->{foreign_key} // "${rel_name}_id";
-                $on_clause = "$related_table.id = $local_table.$foreign_key";
-            }
-            else {
-                # has_many: foreign key is on related table
-                # e.g., Company has_many Employees: employees.company_id = companies.id
-                my $foreign_key = $meta->{foreign_key} // "${rel_name}_id";
-                $on_clause = "$related_table.$foreign_key = $local_table.$local_pk";
-            }
-
-            # Allow override
-            $on_clause = $rel_opts->{on} // $on_clause;
-
-            push @join_parts, "$join_type JOIN $related_table ON $on_clause";
-        }
-        elsif ($rel_opts && $rel_opts->{on}) {
-            # Explicit override without metadata - use explicit settings
-            my $join_type = $rel_opts->{type} // 'LEFT';
-            my $related_table = $rel_opts->{table} // $rel_name;
-
-            # Skip if this table is already joined (avoid duplicates)
-            my $already_joined = 0;
-            for my $existing (@join_parts) {
-                if ($existing =~ /\b$related_table\b/) {
-                    $already_joined = 1;
-                    last;
-                }
-            }
-            unless ($already_joined) {
-                push @join_parts, "$join_type JOIN $related_table ON $rel_opts->{on}";
-            }
-        }
-    }
-
-    return @join_parts;
+    return $self->query_builder->build_joins($self->join_specs);
 }
 
 sub _needs_distinct ($self) {
-    # Return true if any join_specs include has_many relationships
-    my $class = $self->class;
-
-    for my $rel (@{$self->join_specs}) {
-        my $rel_name;
-
-        if (ref $rel eq 'HASH') {
-            ($rel_name) = keys %$rel;
-        }
-        else {
-            $rel_name = $rel;
-        }
-
-        my $meta = $class->related_to($rel_name);
-        if ($meta && $meta->{_relationship_type} eq 'has_many') {
-            return 1;
-        }
-    }
-
-    return 0;
+    return $self->query_builder->needs_distinct($self->join_specs);
 }
 
 sub count ($self) {
     my $class = $self->class;
-    my $table = $class->table;
     my $dbh   = $class->db->dbh;
 
-    my @where_parts;
-    my @bind_values;
-
-    for my $col (keys %{$self->conditions}) {
-        my $val = $self->conditions->{$col};
-        if (ref $val eq 'HASH') {
-            for my $op (keys %$val) {
-                push @where_parts, "$col $op ?";
-                push @bind_values, $val->{$op};
-            }
-        }
-        else {
-            push @where_parts, "$col = ?";
-            push @bind_values, $val;
-        }
-    }
-
-    # Build JOIN clauses
-    my @join_parts = $self->_build_join_sql();
-
-    # Determine if we need DISTINCT
-    my $needs_distinct = $self->_needs_distinct();
-    my $count_expr = $needs_distinct ? "COUNT(DISTINCT $table." . $class->primary_key . ")" : "COUNT(*)";
-
-    my $sql = "SELECT $count_expr FROM $table";
-    $sql .= " " . join(' ', @join_parts) if @join_parts;
-    $sql .= " WHERE " . join(' AND ', @where_parts) if @where_parts;
+    my ($sql, $bind_values) = $self->query_builder->build_count({
+        conditions => $self->conditions,
+        join_specs => $self->join_specs,
+    });
 
     my $start = time();
     my $sth = $dbh->prepare($sql);
-    $sth->execute(@bind_values);
+    $sth->execute(@$bind_values);
     my $duration = (time() - $start) * 1000;
     
     if ($ENV{ORM_SQL_LOGGING}) {
         my $logger = Durance::Logger->new;
-        my $params_str = @bind_values ? '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @bind_values) . ']' : '';
+        my $params_str = @$bind_values ? '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @$bind_values) . ']' : '';
         $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $sql $params_str");
     }
     

@@ -43,12 +43,16 @@ This project implements an Object Relational Mapper in Perl that has a similar w
 
 ```
 lib/
-├── ORM/
-│   ├── DB.pm        # Where DB credentials/data source name, other connection details are stored 
-│   ├── Model.pm     # The parent class users will subclass in their models 
-│   └── Schema.pm    # Schema management
+├── Durance/
+│   ├── DB.pm           # Database connection management
+│   ├── Model.pm        # ActiveRecord-style base class
+│   ├── ResultSet.pm    # Chainable query builder
+│   ├── QueryBuilder.pm # SQL query building
+│   ├── Schema.pm       # Schema introspection/migration
+│   ├── DSL.pm          # DSL functions
+│   └── Logger.pm       # SQL logging
 t/
-└── orm.t            # Test file
+└── orm.t               # Test file
 ```
 
 ## Build/Lint/Test Commands

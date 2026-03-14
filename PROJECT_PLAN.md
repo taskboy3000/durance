@@ -12,7 +12,7 @@ schema management, relationship support (has_many, belongs_to, has_one,
 many_to_many), SQL JOIN queries, eager loading (preload), validations,
 and auto-timestamps.
 
-**Test Suite:** 7 test files, 40 tests, ALL PASSING
+**Test Suite:** 8 test files, 56 tests, ALL PASSING
 
 ---
 
@@ -24,6 +24,7 @@ and auto-timestamps.
 | `lib/Durance/Model.pm` | WORKING | ActiveRecord-style base class with CRUD, relationships, JOINs |
 | `lib/Durance/DB.pm` | WORKING | Database connection management with handle pooling |
 | `lib/Durance/ResultSet.pm` | WORKING | Chainable query builder with JOIN support |
+| `lib/Durance/QueryBuilder.pm` | WORKING | SQL query building with driver-aware generation |
 | `lib/Durance/Schema.pm` | WORKING | Schema introspection, DDL generation, migration |
 | `lib/Durance/Logger.pm` | WORKING | SQL logging to STDERR |
 
@@ -77,7 +78,7 @@ and auto-timestamps.
 
 **Attributes:** `class` (ro, required), `conditions` (rw),
 `order_by` (rw), `limit_val` (rw), `offset_val` (rw),
-`join_specs` (rw), `preload_specs` (rw)
+`join_specs` (rw), `preload_specs` (rw), `query_builder` (ro)
 
 **Methods:**
 - `where($conditions)` - Add WHERE conditions (chainable)
@@ -89,6 +90,18 @@ and auto-timestamps.
 - `all` - Execute query, return results
 - `first` - Execute with LIMIT 1, return first result
 - `count` - Execute COUNT(*) query
+
+### Durance::QueryBuilder
+
+**Attributes:** `class` (ro, required), `driver` (rw)
+
+**Methods:**
+- `build_where($conditions)` - Generate WHERE clause, returns (clause, bind_values)
+- `build_joins($specs)` - Generate JOIN clauses
+- `build_select($options)` - Generate SELECT SQL with all clauses
+- `build_count($options)` - Generate COUNT SQL
+- `needs_distinct($specs)` - Check if DISTINCT is needed for has_many
+- `driver_from_dsn($dsn)` - Extract driver type from DSN
 
 ### Durance::Schema
 
@@ -370,6 +383,7 @@ developer experience and catch errors early.
 | `lib/Durance/Model.pm` | Base class for ORM models |
 | `lib/Durance/DB.pm` | Database connection management |
 | `lib/Durance/ResultSet.pm` | Chainable query builder |
+| `lib/Durance/QueryBuilder.pm` | SQL query building with driver support |
 | `lib/Durance/Schema.pm` | Schema introspection and migration |
 | `lib/Durance/Logger.pm` | SQL logging to STDERR |
 | `t/orm.t` | Comprehensive test suite |
@@ -379,6 +393,7 @@ developer experience and catch errors early.
 | `t/count_with_join.t` | COUNT with JOIN tests |
 | `t/many_to_many.t` | many_to_many relationship tests |
 | `t/column_aliasing.t` | Column aliasing for JOIN tests |
+| `t/query_builder.t` | QueryBuilder tests |
 | `t/MyApp/DB.pm` | Test DB configuration |
 | `t/MyApp/Model/app/user.pm` | Test model (users table) |
 | `t/MyApp/Model/admin/role.pm` | Test model (roles table) |
@@ -855,7 +870,7 @@ Benchmark SQL queries and model operations.
 
 ---
 
-### Task 23. Refactor Durance::Model (Extract Query Builder)
+### Task 23. Refactor Durance::Model (Extract Query Builder) ✓ COMPLETED
 
 Extract query building logic from Durance::Model into a separate Durance::QueryBuilder class
 to reduce the God Object (8 responsibilities).
@@ -870,47 +885,47 @@ to reduce the God Object (8 responsibilities).
 
 **Implementation Steps:**
 
-- [ ] **Step 1: Analyze Durance::Model responsibilities**
-  - [ ] Document all methods in Durance::Model
-  - [ ] Categorize into responsibility groups
-  - [ ] Identify what's truly "query building" vs "model logic"
+- [x] **Step 1: Analyze Durance::Model responsibilities**
+  - [x] Document all methods in Durance::Model
+  - [x] Categorize into responsibility groups
+  - [x] Identify what's truly "query building" vs "model logic"
 
-- [ ] **Step 2: Create Durance::QueryBuilder module**
-  - [ ] Create `lib/Durance/QueryBuilder.pm`
-  - [ ] Define core query building methods:
+- [x] **Step 2: Create Durance::QueryBuilder module**
+  - [x] Create `lib/Durance/QueryBuilder.pm`
+  - [x] Define core query building methods:
     - `where($conditions)` - Build WHERE clause
     - `order($clause)` - Build ORDER BY
     - `limit($n)` - Build LIMIT
     - `offset($n)` - Build OFFSET
     - `add_joins(@relations)` - Build JOINs
-  - [ ] Add SQL generation methods:
+  - [x] Add SQL generation methods:
     - `build_select()` - Generate SELECT SQL
     - `build_where()` - Generate WHERE clause
     - `build_joins()` - Generate JOIN clauses
-  - [ ] Add driver-aware SQL generation (for MariaDB/MySQL compatibility)
+  - [x] Add driver-aware SQL generation (for MariaDB/MySQL compatibility)
 
-- [ ] **Step 3: Extract relationship query logic**
-  - [ ] Move has_many query generation to QueryBuilder
-  - [ ] Move belongs_to query generation to QueryBuilder
-  - [ ] Move has_one query generation to QueryBuilder
-  - [ ] Move many_to_many query generation to QueryBuilder
+- [x] **Step 3: Extract relationship query logic**
+  - [x] Move has_many query generation to QueryBuilder
+  - [x] Move belongs_to query generation to QueryBuilder
+  - [x] Move has_one query generation to QueryBuilder
+  - [x] Move many_to_many query generation to QueryBuilder
 
-- [ ] **Step 4: Update Durance::Model to use QueryBuilder**
-  - [ ] Update has_many accessor to delegate to QueryBuilder
-  - [ ] Update belongs_to accessor to delegate to QueryBuilder
-  - [ ] Update has_one accessor to delegate to QueryBuilder
-  - [ ] Update many_to_many accessor to delegate to QueryBuilder
+- [x] **Step 4: Update Durance::Model to use QueryBuilder**
+  - [x] Update has_many accessor to delegate to QueryBuilder
+  - [x] Update belongs_to accessor to delegate to QueryBuilder
+  - [x] Update has_one accessor to delegate to QueryBuilder
+  - [x] Update many_to_many accessor to delegate to QueryBuilder
 
-- [ ] **Step 5: Create tests for QueryBuilder**
-  - [ ] Test basic query building (where, order, limit)
-  - [ ] Test JOIN query building
-  - [ ] Test relationship query building
-  - [ ] Test SQL generation methods
+- [x] **Step 5: Create tests for QueryBuilder**
+  - [x] Test basic query building (where, order, limit)
+  - [x] Test JOIN query building
+  - [x] Test relationship query building
+  - [x] Test SQL generation methods
 
-- [ ] **Step 6: Run integration tests**
-  - [ ] All existing tests pass
-  - [ ] No regressions in functionality
-  - [ ] Performance not degraded
+- [x] **Step 6: Run integration tests**
+  - [x] All existing tests pass
+  - [x] No regressions in functionality
+  - [x] Performance not degraded
 
 **Target Architecture:**
 
