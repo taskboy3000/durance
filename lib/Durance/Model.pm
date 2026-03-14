@@ -9,12 +9,7 @@ use Moo;
 use Time::HiRes qw(time);
 
 our %COLUMN_META;
-our ( %_columns, %_primary_key, 
-      %_has_many, %_belongs_to, %_validations );
-
-
-has primaryKey => (is => 'lazy');
-sub _build_primaryKey {'id'};
+our ( %_columns, %_primary_key, %_validations );
 
 has 'logger' => (is => 'lazy');
 sub _build_logger ($self) {
@@ -81,12 +76,21 @@ sub db {
 }
 
 sub _db_class_for ($class) {
-    my $pkg = $class =~ /::$/ ? $class : $class;
+    my $pkg = ref $class || $class;
+    
+    # Replace ::Model:: with ::DB:: anywhere in the package
     $pkg =~ s/::Model::/::DB::/;
+    
+    # Replace ::Model at the end
     $pkg =~ s/::Model$/::DB/;
-    if ($pkg =~ /^(.+::)DB::([^:]+)$/) {
-        $pkg = "$1DB";
+    
+    # Strip everything after ::DB:: to get base DB class
+    # MyApp::DB::app::user -> MyApp::DB
+    # MyApp::DB::admin::role -> MyApp::DB
+    if ($pkg =~ /^(.+::DB)::/) {
+        $pkg = $1;
     }
+    
     return $pkg;
 }
 
@@ -278,7 +282,7 @@ sub preload ($class, @relations) {
     return $rs;
 }
 
-# Mented to a called as a class method
+# Meant to be called as a class method
 sub create ( $class, $data ) {
     my $dbh = $class->db->dbh;
 
@@ -294,10 +298,6 @@ sub create ( $class, $data ) {
     }
 
     return $class->new( %$data, db => $class->db )->insert;
-}
-
-sub _columns_info ($class) {
-    return {};
 }
 
 sub insert ($self) {

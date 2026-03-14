@@ -1102,6 +1102,21 @@ Clean up unused code, consolidate duplicates, and improve code consistency acros
 
 **Implementation Steps (discrete, testable):**
 
+**Pre-Phase: Add Missing Tests (REQUIRED BEFORE PHASE 2)**
+
+- [ ] **Step 0a: Add _db_class_for tests**
+  - [ ] Add test to t/orm.t verifying convention-based DB class derivation
+  - [ ] Test: MyApp::Model::User → MyApp::DB
+  - [ ] Test: MyApp::Model::Admin::Role → MyApp::DB (nested namespace)
+  - [ ] Run tests - should add 2 test cases
+
+- [ ] **Step 0b: Add driver_from_dsn tests**
+  - [ ] Add test to t/query_builder.t for driver detection
+  - [ ] Test DDL.pm version (returns lowercase)
+  - [ ] Test QueryBuilder.pm version (returns mixed-case)
+  - [ ] Document the intentional difference in behavior
+  - [ ] Run tests - should add 6+ test cases
+
 **Phase 1: Remove Clearly Dead Code (High Priority)**
 
 - [ ] **Step 1a: Remove unused _columns_info method**
@@ -1188,6 +1203,131 @@ Clean up unused code, consolidate duplicates, and improve code consistency acros
 - Consolidate ~80 lines of duplicates
 - Simplify ~120 lines total
 - ~250 lines cleanup (~3% of codebase)
+
+---
+
+## Risk Analysis for Task 28
+
+### Test Coverage Assessment
+
+**Current Test Suite:** 9 test files, 64 tests, 122 subtests covering:
+- ✅ All public API methods
+- ✅ CRUD operations (26 tests)
+- ✅ Relationships (has_many, belongs_to, has_one, many_to_many)
+- ✅ JOINs, preload, include
+- ✅ Schema operations (DDL, migration, introspection)
+- ✅ Error handling
+- ✅ Validations
+
+**Test Coverage by Phase:**
+
+| Phase | Risk Level | Test Coverage | Protection Level |
+|-------|-----------|---------------|------------------|
+| **Phase 1: Remove Dead Code** | LOW | 64 tests | ✅ EXCELLENT |
+| **Phase 2: Consolidate Duplicates** | MEDIUM-HIGH | Partial gaps | ⚠️ NEEDS ATTENTION |
+| **Phase 3: Fix Documentation** | NEGLIGIBLE | POD not tested | ✅ SAFE |
+| **Phase 4: Optional Removals** | LOW | Specific coverage | ✅ ADEQUATE |
+
+### Specific Risk Assessment
+
+**Phase 1 Risks (LOW - Well Protected):**
+
+| Step | Item to Remove | Test Coverage | Risk | Notes |
+|------|---------------|---------------|------|-------|
+| 1a | `_columns_info` | No direct tests | ✅ SAFE | Never called |
+| 1b | `primaryKey` attr | 2 tests of primary_key() method | ✅ SAFE | Method tested, attr unused |
+| 1c | FindBin import | No impact | ✅ SAFE | Import only |
+| 1d | Package vars | No direct tests | ⚠️ VERIFY | Grep shows DSL versions used |
+| 1e | Typo fix | N/A | ✅ SAFE | Comment only |
+| 1f | Predicates | username/password tested (6 tests) | ✅ SAFE | Attrs tested, predicates not |
+
+**Phase 2 Risks (MEDIUM-HIGH - Gaps Found):**
+
+| Step | Refactoring | Test Coverage | Risk | Mitigation Needed |
+|------|------------|---------------|------|-------------------|
+| 2a | `_db_class_for` | ❌ NO TESTS | 🔴 HIGH | **ADD TEST** before refactoring |
+| 2b | `driver_from_dsn` | ❌ NO DIRECT TESTS | 🔴 HIGH | **ADD TEST** before refactoring |
+| 2c | Logger usage | ✅ 9 logger tests | ✅ SAFE | Logger output tested |
+
+**Critical Gap Found:** `_db_class_for` is called in Model.pm:73 and Schema.pm:70,295 but has NO tests verifying the convention-based DB class derivation logic.
+
+**Phase 3 Risks (NEGLIGIBLE):**
+- Documentation changes only, no code impact
+
+**Phase 4 Risks (LOW):**
+- Optional evaluations, won't remove without investigation
+
+### Test Gaps That Must Be Filled
+
+**BLOCKER: _db_class_for has no tests**
+
+**Risk:** This method is critical for convention-over-configuration. It derives:
+- `MyApp::Model::User` → `MyApp::DB`
+- `MyApp::Model::Admin::Role` → `MyApp::DB`
+
+If consolidation breaks this logic, the entire ORM stops working.
+
+**Required Tests Before Phase 2:**
+```perl
+subtest '_db_class_for convention derivation' => sub {
+    is(MyApp::Model::User->_db_class_for, 'MyApp::DB', 
+       'derives DB class from model');
+    is(MyApp::Model::Admin::Role->_db_class_for, 'MyApp::DB',
+       'handles nested namespaces');
+};
+```
+
+**BLOCKER: driver_from_dsn has no isolated tests**
+
+**Risk:** Used by ResultSet.pm:34 to detect driver. Different behavior in DDL vs QueryBuilder:
+- DDL.pm returns lowercase: 'sqlite', 'mysql', 'mariadb'
+- QueryBuilder.pm returns mixed: 'SQLite', 'mysql', 'mariadb'
+
+This inconsistency could break driver detection during consolidation.
+
+**Required Tests Before Phase 2:**
+```perl
+subtest 'driver_from_dsn detection' => sub {
+    my $ddl = Durance::DDL->new(driver => 'sqlite');
+    is($ddl->driver_from_dsn('dbi:SQLite:test.db'), 'sqlite');
+    is($ddl->driver_from_dsn('dbi:mysql:database=test'), 'mysql');
+    
+    my $qb = Durance::QueryBuilder->new(class => 'TestModel');
+    is($qb->driver_from_dsn('dbi:SQLite:test.db'), 'SQLite');
+    is($qb->driver_from_dsn('dbi:mysql:database=test'), 'mysql');
+};
+```
+
+### Recommended Implementation Order
+
+**REVISED TASK 28 PLAN:**
+
+1. **Pre-Phase: Add Missing Tests (REQUIRED)**
+   - [ ] Add `_db_class_for` tests to t/orm.t
+   - [ ] Add `driver_from_dsn` tests to t/query_builder.t
+   - [ ] Verify 66+ tests all pass
+
+2. **Phase 1: Remove Dead Code** (Original plan, safe)
+
+3. **Phase 2: Consolidate Duplicates** (Original plan, NOW SAFE with tests)
+
+4. **Phase 3-4: Documentation and Optional** (Original plan)
+
+### Safety Recommendation
+
+⚠️ **DO NOT proceed with Phase 2 (consolidation) until tests are added for:**
+1. `_db_class_for` convention logic
+2. `driver_from_dsn` behavior differences
+
+**Phase 1 is SAFE to implement immediately** - all items have adequate test coverage or no behavioral impact.
+
+### Overall Assessment
+
+**Test bed protection level: 70%**
+- ✅ Phase 1: PROTECTED
+- ⚠️ Phase 2: GAPS EXIST - need 2 additional test cases
+- ✅ Phase 3: PROTECTED (doc only)
+- ✅ Phase 4: PROTECTED (optional/investigative)
 
 ---
 

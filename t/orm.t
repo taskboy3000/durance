@@ -1416,6 +1416,41 @@ subtest 'Durance::Model - Basic attributes' => sub {
     # create_test_db($myApp);
 };
 
+subtest 'DB class derivation via convention' => sub {
+    # Test that db() method correctly derives DB class from model namespace
+    # Internal: uses _db_class_for to convert MyApp::Model::* -> MyApp::DB
+    
+    my $user_db = MyApp::Model::app::user->db;
+    is(ref($user_db), 'MyApp::DB', 'simple model derives MyApp::DB');
+    
+    my $role_db = MyApp::Model::admin::role->db;
+    is(ref($role_db), 'MyApp::DB', 'nested namespace model derives MyApp::DB');
+    
+    # Verify they return the same cached instance (class-level caching)
+    my $user_db2 = MyApp::Model::app::user->db;
+    is($user_db, $user_db2, 'same DB instance returned (cached)');
+};
+
+subtest 'DDL driver_from_dsn detection' => sub {
+    require Durance::DDL;
+    
+    my $ddl = Durance::DDL->new(driver => 'sqlite');
+    
+    # DDL version returns lowercase, defaults to sqlite for unknown
+    is($ddl->driver_from_dsn('dbi:SQLite:dbname=test.db'), 'sqlite', 
+       'SQLite detected as lowercase');
+    is($ddl->driver_from_dsn('dbi:mysql:database=test'), 'mysql',
+       'mysql detected');
+    is($ddl->driver_from_dsn('dbi:MariaDB:database=test'), 'mariadb',
+       'MariaDB detected as mariadb');
+    
+    # Test fallback to sqlite for unknown drivers
+    is($ddl->driver_from_dsn('dbi:Pg:dbname=test'), 'sqlite',
+       'Unknown driver (Pg) falls back to sqlite');
+    is($ddl->driver_from_dsn('dbi:Oracle:test'), 'sqlite',
+       'Unknown driver (Oracle) falls back to sqlite');
+};
+
 done_testing;
 
 __END__

@@ -295,4 +295,24 @@ subtest 'QueryBuilder - ON clause validation' => sub {
     like($exception, qr/semicolons/i, 'error mentions semicolons');
 };
 
+subtest 'driver_from_dsn detection' => sub {
+    my $qb = Durance::QueryBuilder->new(class => 'MyApp::Model::User');
+    
+    # QueryBuilder returns mixed-case, defaults to SQLite for unknown
+    is($qb->driver_from_dsn('dbi:SQLite:dbname=test.db'), 'SQLite', 
+       'SQLite detected (mixed-case)');
+    is($qb->driver_from_dsn('dbi:mysql:database=test'), 'mysql',
+       'mysql detected (lowercase)');
+    is($qb->driver_from_dsn('dbi:MariaDB:database=test'), 'mariadb',
+       'MariaDB detected as mariadb (lowercase)');
+    is($qb->driver_from_dsn('dbi:Pg:dbname=test'), 'PostgreSQL',
+       'Pg detected as PostgreSQL');
+    
+    # Test fallback to SQLite for unknown drivers
+    is($qb->driver_from_dsn('dbi:Oracle:test'), 'SQLite',
+       'Unknown driver (Oracle) falls back to SQLite');
+    is($qb->driver_from_dsn('dbi:Unknown:test'), 'SQLite',
+       'Unknown driver falls back to SQLite');
+};
+
 done_testing;

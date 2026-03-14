@@ -12,8 +12,8 @@ use Moo;
 our %HANDLES;
 
 has dsn             => (is => 'lazy');
-has username        => (is => 'ro', predicate => 1);
-has password        => (is => 'ro', predicate => 1);
+has username        => (is => 'ro');
+has password        => (is => 'ro');
 has driver_options  => (is => 'lazy');
 
 sub _build_driver_options { { RaiseError => 1, AutoCommit => 1 } };

@@ -6,7 +6,6 @@ use experimental 'signatures';
 
 
 use Cwd;
-use FindBin;
 use File::Find;
 use Moo;
 use Time::HiRes qw(time);
@@ -44,12 +43,21 @@ sub _detect_driver ( $self, $dbh = undef ) {
 }
 
 sub _db_class_for ($class) {
-    my $pkg = $class =~ /::$/ ? $class : $class;
+    my $pkg = ref $class || $class;
+    
+    # Replace ::Model:: with ::DB:: anywhere in the package
     $pkg =~ s/::Model::/::DB::/;
+    
+    # Replace ::Model at the end
     $pkg =~ s/::Model$/::DB/;
-    if ($pkg =~ /^(.+::)DB::([^:]+)$/) {
-        $pkg = "$1DB";
+    
+    # Strip everything after ::DB:: to get base DB class
+    # MyApp::DB::app::user -> MyApp::DB
+    # MyApp::DB::admin::role -> MyApp::DB
+    if ($pkg =~ /^(.+::DB)::/) {
+        $pkg = $1;
     }
+    
     return $pkg;
 }
 
