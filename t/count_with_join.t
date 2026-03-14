@@ -10,15 +10,15 @@ use File::Basename;
 use lib dirname($FindBin::Bin) . '/lib';
 
 # Import ORM modules
-require ORM::Model;
-require ORM::Schema;
-require ORM::DSL;
-require ORM::DB;
+require Durance::Model;
+require Durance::Schema;
+require Durance::DSL;
+require Durance::DB;
 
 # Test database setup - creates temp file each time
 package CountTestDB;
 use Moo;
-extends 'ORM::DB';
+extends 'Durance::DB';
 use File::Temp qw(tempfile);
 
 has 'temp_file' => (is => 'lazy');
@@ -36,7 +36,7 @@ sub _build_dsn ($self) {
 # Test model base class
 package CountTestModel;
 use Moo;
-extends 'ORM::Model';
+extends 'Durance::Model';
 
 sub _db_class_for { return 'CountTestDB'; }
 
@@ -46,12 +46,12 @@ package main;
 # Test Suite: COUNT with JOIN
 # ============================================================================
 
-subtest 'ORM::ResultSet - COUNT with JOIN' => sub {
+subtest 'Durance::ResultSet - COUNT with JOIN' => sub {
     # Define test models
     package MyApp::Model::Author;
     use Moo;
     extends 'CountTestModel';
-    use ORM::DSL;
+    use Durance::DSL;
 
     tablename 'authors';
     column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -62,7 +62,7 @@ subtest 'ORM::ResultSet - COUNT with JOIN' => sub {
     package MyApp::Model::Book;
     use Moo;
     extends 'CountTestModel';
-    use ORM::DSL;
+    use Durance::DSL;
 
     tablename 'books';
     column id        => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -75,7 +75,7 @@ subtest 'ORM::ResultSet - COUNT with JOIN' => sub {
     package MyApp::Model::Publisher;
     use Moo;
     extends 'CountTestModel';
-    use ORM::DSL;
+    use Durance::DSL;
 
     tablename 'publishers';
     column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -86,7 +86,7 @@ subtest 'ORM::ResultSet - COUNT with JOIN' => sub {
     package MyApp::Model::PublishedBook;
     use Moo;
     extends 'CountTestModel';
-    use ORM::DSL;
+    use Durance::DSL;
 
     tablename 'published_books';
     column id           => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -101,7 +101,7 @@ subtest 'ORM::ResultSet - COUNT with JOIN' => sub {
 
     # Create schema and tables
     my $dbh = MyApp::Model::Author->db->dbh;
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
     
     $schema->create_table(MyApp::Model::Author->new);
     $schema->create_table(MyApp::Model::Book->new);

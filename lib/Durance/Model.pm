@@ -1,5 +1,5 @@
 # All code copyright Joe Johnston <jjohn@taskboy.com> 2026
-package ORM::Model;
+package Durance::Model;
 use strict;
 use warnings;
 use experimental 'signatures';
@@ -18,8 +18,8 @@ sub _build_primaryKey {'id'};
 
 has 'logger' => (is => 'lazy');
 sub _build_logger ($self) {
-    require ORM::Logger;
-    return ORM::Logger->new;
+    require Durance::Logger;
+    return Durance::Logger->new;
 }
 
 sub BUILD {
@@ -42,7 +42,7 @@ sub BUILD {
 
 
 sub import {
-    # Do nothing - users should explicitly use ORM::DSL
+    # Do nothing - users should explicitly use Durance::DSL
 }
 
 sub db {
@@ -108,44 +108,44 @@ sub column_meta ( $class, $column ) {
 
 sub columns ($self) {
     my $class = ref $self || $self;
-    return $ORM::Model::_columns{$class} // [];
+    return $Durance::Model::_columns{$class} // [];
 }
 
 sub primary_key ($self) {
     my $class = ref $self || $self;
-    return $ORM::Model::_primary_key{$class} // 'id';
+    return $Durance::Model::_primary_key{$class} // 'id';
 }
 
 sub validations ($self, $name) {
     my $class = ref $self || $self;
-    return $ORM::Model::_validations{$class}{$name} // {};
+    return $Durance::Model::_validations{$class}{$name} // {};
 }
 
 sub attributes ($self) {
     my $class = ref $self || $self;
-    return $ORM::Model::_columns{$class} // [];
+    return $Durance::Model::_columns{$class} // [];
 }
 
 sub has_many_relations ($class) {
     my $class_name = ref $class || $class;
-    return $ORM::DSL::_has_many{$class_name} // {};
+    return $Durance::DSL::_has_many{$class_name} // {};
 }
 
 sub belongs_to_relations ($class) {
     my $class_name = ref $class || $class;
-    return $ORM::DSL::_belongs_to{$class_name} // {};
+    return $Durance::DSL::_belongs_to{$class_name} // {};
 }
 
 sub has_one_relations ($class) {
     my $class_name = ref $class || $class;
-    return $ORM::DSL::_has_one{$class_name} // {};
+    return $Durance::DSL::_has_one{$class_name} // {};
 }
 
 sub related_to ($class, $name) {
     my $class_name = ref $class || $class;
-    return $ORM::DSL::_has_many{$class_name}{$name} 
-        // $ORM::DSL::_belongs_to{$class_name}{$name}
-        // $ORM::DSL::_has_one{$class_name}{$name};
+    return $Durance::DSL::_has_many{$class_name}{$name} 
+        // $Durance::DSL::_belongs_to{$class_name}{$name}
+        // $Durance::DSL::_has_one{$class_name}{$name};
 }
 
 sub all_relations ($class) {
@@ -182,7 +182,7 @@ sub find ( $class, $id ) {
     my $duration = (time() - $start) * 1000;
     
     if ($ENV{ORM_SQL_LOGGING}) {
-        my $logger = ORM::Logger->new;
+        my $logger = Durance::Logger->new;
         $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $stmt [$id]");
     }
 
@@ -206,7 +206,7 @@ sub all ($class) {
     my $duration = (time() - $start) * 1000;
     
     if ($ENV{ORM_SQL_LOGGING}) {
-        my $logger = ORM::Logger->new;
+        my $logger = Durance::Logger->new;
         $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $stmt");
     }
 
@@ -302,7 +302,7 @@ sub insert ($self) {
     my $duration = (time() - $start) * 1000;
     
     if ($ENV{ORM_SQL_LOGGING}) {
-        my $logger = ORM::Logger->new;
+        my $logger = Durance::Logger->new;
         my $params_str = '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @vals) . ']';
         $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $stmt $params_str");
     }
@@ -353,7 +353,7 @@ sub update ($self) {
     my $duration = (time() - $start) * 1000;
     
     if ($ENV{ORM_SQL_LOGGING}) {
-        my $logger = ORM::Logger->new;
+        my $logger = Durance::Logger->new;
         my @all_params = (@vals, $pk_val);
         my $params_str = '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @all_params) . ']';
         $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $stmt $params_str");
@@ -379,7 +379,7 @@ sub delete ($self) {
     my $duration = (time() - $start) * 1000;
     
     if ($ENV{ORM_SQL_LOGGING}) {
-        my $logger = ORM::Logger->new;
+        my $logger = Durance::Logger->new;
         $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $stmt [$pk_val]");
     }
     
@@ -406,10 +406,10 @@ sub to_hash ($self) {
 }
 
 sub _load_resultset {
-    unless (defined &ORM::ResultSet::where) {
-        require ORM::ResultSet;
+    unless (defined &Durance::ResultSet::where) {
+        require Durance::ResultSet;
     }
-    return 'ORM::ResultSet';
+    return 'Durance::ResultSet';
 }
 
 1;
@@ -420,14 +420,14 @@ __END__
 
 =head1 NAME
 
-ORM::Model - Base class for ORM models
+Durance::Model - Base class for ORM models
 
 =head1 SYNOPSIS
 
     package MyApp::Model::User;
     use Moo;
-    extends 'ORM::Model';
-    use ORM::Model qw(column);
+    extends 'Durance::Model';
+    use Durance::Model qw(column);
 
     column id      => (is => 'rw', isa => 'Int', primary_key => 1);
     column name    => (is => 'rw', isa => 'Str', required => 1);
@@ -444,12 +444,12 @@ ORM::Model - Base class for ORM models
 
 =head1 DESCRIPTION
 
-ORM::Model provides an ActiveRecord-style interface for database models.
+Durance::Model provides an ActiveRecord-style interface for database models.
 It supports column definitions, CRUD operations, and chainable queries.
 
 =head1 PACKAGE FUNCTIONS
 
-These functions are available to model classes via C<use ORM::Model>.
+These functions are available to model classes via C<use Durance::Model>.
 
 =head2 column
 
@@ -569,7 +569,7 @@ Returns the table name for the model.
 
     my $db = MyApp::Model::User->db;
 
-Gets the ORM::DB instance for the class. The DB class is automatically
+Gets the Durance::DB instance for the class. The DB class is automatically
 derived from the model package name (e.g., MyApp::Model::User → MyApp::DB).
 
 To use a custom DB instance, define C<sub _build_db> in your model:
@@ -639,15 +639,15 @@ Returns a hashref of the model's data (excluding the C<db> reference).
 
     my $db = $user->db;
 
-Gets the ORM::DB instance associated with this model. Configure by defining
+Gets the Durance::DB instance associated with this model. Configure by defining
 C<sub _build_db { ... }> in your model class.
 
 =head1 EXAMPLE
 
     package MyApp::Model::User;
     use Moo;
-    extends 'ORM::Model';
-    use ORM::Model qw(column);
+    extends 'Durance::Model';
+    use Durance::Model qw(column);
 
     column id         => (is => 'rw', isa => 'Int', primary_key => 1);
     column name       => (is => 'rw', isa => 'Str', required => 1);

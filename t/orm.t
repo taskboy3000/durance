@@ -15,12 +15,12 @@ use lib ("$::PROJ_ROOT/lib", "$::PROJ_ROOT/t");
 use Test2::V0;
 
 use MyApp::DB;
-use ORM::Schema;
+use Durance::Schema;
 
 # Test database class - defined once for all tests
 package TestDB;
 use Moo;
-extends 'ORM::DB';
+extends 'Durance::DB';
 use FindBin;
 
 sub _build_dsn { 
@@ -31,7 +31,7 @@ sub _build_dsn {
 # Base model class for test models that use TestDB
 package TestModel;
 use Moo;
-extends 'ORM::Model';
+extends 'Durance::Model';
 
 sub _db_class_for { return 'TestDB'; }
 
@@ -49,10 +49,10 @@ sub create_test_db ($app) {
     if (-e $gDBName) {
         unlink $gDBName;
     }
-    ORM::Schema->migrate_all($app);
+    Durance::Schema->migrate_all($app);
 }
 
-subtest 'ORM::DB - attributes and methods' => sub {
+subtest 'Durance::DB - attributes and methods' => sub {
     my $db = TestDB->new;
 
     subtest 'attributes' => sub {
@@ -107,11 +107,11 @@ subtest 'ORM::DB - attributes and methods' => sub {
     package main;
 };
 
-subtest 'ORM::Schema - constructor and attributes' => sub {
+subtest 'Durance::Schema - constructor and attributes' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
 
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
 
     ok($schema, 'Schema object created');
     is($schema->dbh, $dbh, 'dbh attribute set correctly');
@@ -120,18 +120,18 @@ subtest 'ORM::Schema - constructor and attributes' => sub {
     is($driver, 'sqlite', 'driver auto-detected as sqlite');
 
     subtest 'driver override' => sub {
-        my $schema_mysql = ORM::Schema->new(dbh => $dbh, driver => 'mysql');
+        my $schema_mysql = Durance::Schema->new(dbh => $dbh, driver => 'mysql');
         is($schema_mysql->driver, 'mysql', 'driver can be overridden');
     };
 
     ok($schema->logger, 'logger attribute exists');
 };
 
-subtest 'ORM::Schema - DDL generation' => sub {
+subtest 'Durance::Schema - DDL generation' => sub {
     package MyApp::Model::TestItem;
     use Moo;
-    extends 'ORM::Model';
-    use ORM::DSL;
+    extends 'Durance::Model';
+    use Durance::DSL;
 
     tablename 'test_items';
     column id    => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -143,7 +143,7 @@ subtest 'ORM::Schema - DDL generation' => sub {
 
     my $db = TestDB->new;
     my $dbh = $db->dbh;
-    my $schema = ORM::Schema->new(dbh => $dbh, driver => 'sqlite');
+    my $schema = Durance::Schema->new(dbh => $dbh, driver => 'sqlite');
 
     subtest 'ddl_for_class generates valid SQL' => sub {
         my $sql = $schema->ddl_for_class('MyApp::Model::TestItem', 'sqlite');
@@ -170,8 +170,8 @@ subtest 'ORM::Schema - DDL generation' => sub {
     subtest 'type mapping for SQLite' => sub {
         package MyApp::Model::Types;
         use Moo;
-        extends 'ORM::Model';
-        use ORM::DSL;
+        extends 'Durance::Model';
+        use Durance::DSL;
 
         tablename 'types';
         column id          => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -193,16 +193,16 @@ subtest 'ORM::Schema - DDL generation' => sub {
     };
 };
 
-subtest 'ORM::Schema - table introspection' => sub {
+subtest 'Durance::Schema - table introspection' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
 
     subtest 'table_exists returns false for non-existent table' => sub {
         package MyApp::Model::NonExistent;
         use Moo;
-        extends 'ORM::Model';
-        use ORM::DSL;
+        extends 'Durance::Model';
+        use Durance::DSL;
 
         tablename 'nonexistent_table';
         column id => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -216,8 +216,8 @@ subtest 'ORM::Schema - table introspection' => sub {
     subtest 'table_info returns empty for non-existent table' => sub {
         package MyApp::Model::NonExistent2;
         use Moo;
-        extends 'ORM::Model';
-        use ORM::DSL;
+        extends 'Durance::Model';
+        use Durance::DSL;
 
         tablename 'another_nonexistent';
         column id => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -232,8 +232,8 @@ subtest 'ORM::Schema - table introspection' => sub {
     subtest 'column_info returns metadata from existing table' => sub {
         package MyApp::Model::ColumnInfoTest;
         use Moo;
-        extends 'ORM::Model';
-        use ORM::DSL;
+        extends 'Durance::Model';
+        use Durance::DSL;
 
         tablename 'column_info_test';
         column id    => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -261,16 +261,16 @@ subtest 'ORM::Schema - table introspection' => sub {
     };
 };
 
-subtest 'ORM::Schema - table creation and migration' => sub {
+subtest 'Durance::Schema - table creation and migration' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
 
     subtest 'Step 3.1 & 3.2: Create model and test create_table' => sub {
         package MyApp::Model::CreateTest;
         use Moo;
-        extends 'ORM::Model';
-        use ORM::DSL;
+        extends 'Durance::Model';
+        use Durance::DSL;
 
         tablename 'create_test';
         column id    => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -301,8 +301,8 @@ subtest 'ORM::Schema - table creation and migration' => sub {
     subtest 'Step 3.3: Test pending_changes detects missing columns' => sub {
         package MyApp::Model::PendingCheck;
         use Moo;
-        extends 'ORM::Model';
-        use ORM::DSL;
+        extends 'Durance::Model';
+        use Durance::DSL;
 
         tablename 'create_test';
         column id    => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -321,8 +321,8 @@ subtest 'ORM::Schema - table creation and migration' => sub {
     subtest 'Step 3.3b: Test sync_table creates table' => sub {
         package MyApp::Model::SyncTest3;
         use Moo;
-        extends 'ORM::Model';
-        use ORM::DSL;
+        extends 'Durance::Model';
+        use Durance::DSL;
 
         tablename 'sync_test3';
         column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -339,16 +339,16 @@ subtest 'ORM::Schema - table creation and migration' => sub {
     };
 };
 
-subtest 'ORM::Model - CRUD operations' => sub {
+subtest 'Durance::Model - CRUD operations' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
 
     subtest 'Step 4.1-4.7: Full CRUD workflow' => sub {
         package MyApp::Model::CrudFull;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'crud_full';
         column id    => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -454,16 +454,16 @@ subtest 'ORM::Model - CRUD operations' => sub {
     };
 };
 
-subtest 'ORM::Model - Error handling' => sub {
+subtest 'Durance::Model - Error handling' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
 
     subtest 'EH-1: find() returns undef when record not found' => sub {
         package MyApp::Model::ErrorFind;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'error_find';
         column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -482,7 +482,7 @@ subtest 'ORM::Model - Error handling' => sub {
         package MyApp::Model::ErrorUpdate;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'error_update';
         column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -499,7 +499,7 @@ subtest 'ORM::Model - Error handling' => sub {
         package MyApp::Model::ErrorDelete;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'error_delete';
         column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -515,13 +515,13 @@ subtest 'ORM::Model - Error handling' => sub {
     subtest 'EH-4: db() with invalid DSN throws' => sub {
         package MyApp::Model::BadDSN;
         use Moo;
-        extends 'ORM::Model';
+        extends 'Durance::Model';
 
         sub _db_class_for { 'BadTestDB' }
 
         package BadTestDB;
         use Moo;
-        extends 'ORM::DB';
+        extends 'Durance::DB';
 
         sub _build_dsn { 'dbi:SQLite:dbname=/nonexistent/path/test.db' }
 
@@ -533,16 +533,16 @@ subtest 'ORM::Model - Error handling' => sub {
     };
 };
 
-subtest 'ORM::Model - Auto-timestamps' => sub {
+subtest 'Durance::Model - Auto-timestamps' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
 
     subtest 'AT-1 & AT-2: create() sets created_at and updated_at' => sub {
         package MyApp::Model::TimestampTest;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'timestamp_test';
         column id         => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -565,7 +565,7 @@ subtest 'ORM::Model - Auto-timestamps' => sub {
         package MyApp::Model::TimestampUpdate;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'timestamp_update';
         column id         => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -593,7 +593,7 @@ subtest 'ORM::Model - Auto-timestamps' => sub {
         package MyApp::Model::NoTimestamp;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'no_timestamp';
         column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -613,16 +613,16 @@ subtest 'ORM::Model - Auto-timestamps' => sub {
     };
 };
 
-subtest 'ORM::Model - Complex ResultSet Queries' => sub {
+subtest 'Durance::Model - Complex ResultSet Queries' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
 
     subtest 'RQ-1: where() with comparison operators' => sub {
         package MyApp::Model::CompareTest;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'compare_test';
         column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -654,7 +654,7 @@ subtest 'ORM::Model - Complex ResultSet Queries' => sub {
         package MyApp::Model::LikeTest;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'like_test';
         column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -681,7 +681,7 @@ subtest 'ORM::Model - Complex ResultSet Queries' => sub {
         package MyApp::Model::MultiCondTest;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'multi_cond_test';
         column id      => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -710,7 +710,7 @@ subtest 'ORM::Model - Complex ResultSet Queries' => sub {
         package MyApp::Model::MultiOrderTest;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'multi_order_test';
         column id    => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -736,7 +736,7 @@ subtest 'ORM::Model - Complex ResultSet Queries' => sub {
         package MyApp::Model::DescOrderTest;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'desc_order_test';
         column id    => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -761,7 +761,7 @@ subtest 'ORM::Model - Complex ResultSet Queries' => sub {
         package MyApp::Model::OffsetTest;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'offset_test';
         column id    => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -784,16 +784,16 @@ subtest 'ORM::Model - Complex ResultSet Queries' => sub {
     };
 };
 
-subtest 'ORM::Model - Relationship functions' => sub {
+subtest 'Durance::Model - Relationship functions' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
 
     subtest 'has_many and belongs_to relationships' => sub {
         package MyApp::Model::Author;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'authors';
         column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -804,7 +804,7 @@ subtest 'ORM::Model - Relationship functions' => sub {
         package MyApp::Model::Post;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'posts';
         column id        => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -854,14 +854,14 @@ subtest 'ORM::Model - Relationship functions' => sub {
     };
 };
 
-subtest 'ORM::Model - JOIN Support' => sub {
+subtest 'Durance::Model - JOIN Support' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
 
     package MyApp::Model::Company;
     use Moo;
     extends 'TestModel';
-    use ORM::DSL;
+    use Durance::DSL;
 
     tablename 'companies';
     column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -872,7 +872,7 @@ subtest 'ORM::Model - JOIN Support' => sub {
     package MyApp::Model::Employee;
     use Moo;
     extends 'TestModel';
-    use ORM::DSL;
+    use Durance::DSL;
 
     tablename 'employees';
     column id         => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -884,7 +884,7 @@ subtest 'ORM::Model - JOIN Support' => sub {
 
     package main;
 
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
     my $company_model = MyApp::Model::Company->new(db => $db);
     my $employee_model = MyApp::Model::Employee->new(db => $db);
     $schema->create_table($company_model);
@@ -983,16 +983,16 @@ subtest 'ORM::Model - JOIN Support' => sub {
     };
 };
 
-subtest 'ORM::Model - Validation functions' => sub {
+subtest 'Durance::Model - Validation functions' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
 
     subtest 'Format validation' => sub {
         package MyApp::Model::FormatTest;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'format_test';
         column id    => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -1017,7 +1017,7 @@ subtest 'ORM::Model - Validation functions' => sub {
         package MyApp::Model::LengthTest;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'length_test';
         column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -1040,7 +1040,7 @@ subtest 'ORM::Model - Validation functions' => sub {
         package MyApp::Model::BoolTest;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'bool_test';
         column id      => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -1073,7 +1073,7 @@ subtest 'ORM::Model - Validation functions' => sub {
         package MyApp::Model::MetaTest;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'meta_test';
         column id         => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -1106,7 +1106,7 @@ subtest 'ORM::Model - Validation functions' => sub {
         package MyApp::Model::ValidationsTest;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'validations_test';
         column id    => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -1137,8 +1137,8 @@ subtest 'ORM::Model - Validation functions' => sub {
     subtest 'schema_name method' => sub {
         package MyApp::Model::SchemaTest;
         use Moo;
-        extends 'ORM::Model';
-        use ORM::DSL;
+        extends 'Durance::Model';
+        use Durance::DSL;
 
         tablename 'schema_test';
         column id => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -1150,8 +1150,8 @@ subtest 'ORM::Model - Validation functions' => sub {
         # Test with app:: schema
         package MyApp::Model::app::User;
         use Moo;
-        extends 'ORM::Model';
-        use ORM::DSL;
+        extends 'Durance::Model';
+        use Durance::DSL;
 
         tablename 'app_users';
         column id => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -1162,16 +1162,16 @@ subtest 'ORM::Model - Validation functions' => sub {
     };
 };
 
-subtest 'ORM::Schema - Schema Validation' => sub {
+subtest 'Durance::Schema - Schema Validation' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
 
     subtest 'SV-1: schema_valid returns true for valid schema' => sub {
         package MyApp::Model::ValidSchema;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'valid_schema';
         column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -1194,7 +1194,7 @@ subtest 'ORM::Schema - Schema Validation' => sub {
         package MyApp::Model::MissingTable;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'missing_table_sv';
         column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -1218,7 +1218,7 @@ subtest 'ORM::Schema - Schema Validation' => sub {
         package MyApp::Model::MissingCol;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'valid_schema';
         column id    => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -1271,7 +1271,7 @@ subtest 'ORM::Schema - Schema Validation' => sub {
     };
 };
 
-subtest 'ORM::ResultSet - JOIN Validation' => sub {
+subtest 'Durance::ResultSet - JOIN Validation' => sub {
     my $db = TestDB->new;
     my $dbh = $db->dbh;
 
@@ -1336,7 +1336,7 @@ subtest 'ORM::ResultSet - JOIN Validation' => sub {
         package MyApp::Model::Lonely;
         use Moo;
         extends 'TestModel';
-        use ORM::DSL;
+        use Durance::DSL;
 
         tablename 'lonely';
         column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -1344,7 +1344,7 @@ subtest 'ORM::ResultSet - JOIN Validation' => sub {
 
         package main;
 
-        my $schema = ORM::Schema->new(dbh => $dbh);
+        my $schema = Durance::Schema->new(dbh => $dbh);
         my $model = MyApp::Model::Lonely->new(db => $db);
         $schema->create_table($model);
 
@@ -1377,9 +1377,9 @@ subtest 'ORM::ResultSet - JOIN Validation' => sub {
     };
 };
 
-subtest 'ORM::Model - Basic attributes' => sub {
+subtest 'Durance::Model - Basic attributes' => sub {
     my $myApp = MyApp::DB->new();
-    my @modelClass = ORM::Schema->get_all_models_for_app($myApp);
+    my @modelClass = Durance::Schema->get_all_models_for_app($myApp);
     for my $modelClass (@modelClass) {
         eval "require $modelClass";
         $modelClass->import;
@@ -1401,7 +1401,7 @@ done_testing;
 
 __END__
 if (0) {
-    subtest 'ORM::Model - column definition' => sub {        
+    subtest 'Durance::Model - column definition' => sub {        
         my @cols = @{MyApp::Model::User->columns};
         is(\@cols, array { item 'id'; item 'name'; item 'email'; item 'age'; item 'active' }, 'columns defined');
         
@@ -1425,9 +1425,9 @@ if (0) {
         is($user->age, 25, 'age getter');
     };
 
-    subtest 'ORM::Schema - table operations' => sub {
+    subtest 'Durance::Schema - table operations' => sub {
         my $dbh = create_test_db();
-        my $schema = ORM::Schema->new(dbh => $dbh);
+        my $schema = Durance::Schema->new(dbh => $dbh);
         
         ok(!$schema->table_exists('users'), 'users table does not exist yet');
         
@@ -1449,9 +1449,9 @@ if (0) {
     };
 
 
-    subtest 'ORM::Schema - migrate adds columns' => sub {
+    subtest 'Durance::Schema - migrate adds columns' => sub {
         package MyApp::Model::app::person;
-        use ORM::Model '-base', '-signatures';
+        use Durance::Model '-base', '-signatures';
         
         column id    => (is => 'rw', isa => 'Int', primary_key => 1);
         column name  => (is => 'rw', isa => 'Str');
@@ -1462,7 +1462,7 @@ if (0) {
         
         package main;
         
-        my $schema = ORM::Schema->new;    
+        my $schema = Durance::Schema->new;    
         $schema->migrate(MyApp::Model::app::person->new);
         
         my @cols = $schema->table_info('people');
@@ -1577,8 +1577,8 @@ if (0) {
         
 
 
-        subtest 'ORM::Schema - DDL generation for SQLite' => sub {
-            my $schema = ORM::Schema->new(driver => 'sqlite');
+        subtest 'Durance::Schema - DDL generation for SQLite' => sub {
+            my $schema = Durance::Schema->new(driver => 'sqlite');
 
             my $sql = $schema->ddl_for_class('MyApp::Model::User', 'sqlite');
             like($sql, qr/CREATE TABLE users/,       'contains CREATE TABLE');
@@ -1591,8 +1591,8 @@ if (0) {
             unlike($sql, qr/VARCHAR/,               'no VARCHAR for SQLite');
         };
 
-        subtest 'ORM::Schema - DDL generation for MySQL' => sub {
-            my $schema = ORM::Schema->new(driver => 'mysql');
+        subtest 'Durance::Schema - DDL generation for MySQL' => sub {
+            my $schema = Durance::Schema->new(driver => 'mysql');
 
             my $sql = $schema->ddl_for_class('MyApp::Model::User', 'mysql');
             like($sql, qr/CREATE TABLE users/,       'contains CREATE TABLE');
@@ -1605,9 +1605,9 @@ if (0) {
             unlike($sql, qr/AUTOINCREMENT/,          'no SQLite AUTOINCREMENT');
         };
 
-        subtest 'ORM::Schema - DDL with length and types' => sub {
+        subtest 'Durance::Schema - DDL with length and types' => sub {
             package MyApp::Model::app::article;
-            use ORM::Model 'ORM::Model', '-signatures';
+            use Durance::Model 'Durance::Model', '-signatures';
 
             column id          => (is => 'rw', isa => 'Int', primary_key => 1);
             column title       => (is => 'rw', isa => 'Str', length => 100, required => 1);
@@ -1620,7 +1620,7 @@ if (0) {
 
             package main;
 
-            my $schema = ORM::Schema->new(driver => 'mysql');
+            my $schema = Durance::Schema->new(driver => 'mysql');
             my $sql = $schema->ddl_for_class('MyApp::Model::app::article', 'mysql');
 
             like($sql, qr/title VARCHAR\(100\) NOT NULL/, 'length option respected');
@@ -1637,9 +1637,9 @@ if (0) {
             like($sqlite_sql, qr/created_at TEXT/,         'SQLite: Timestamp is TEXT');
         };
 
-        subtest 'ORM::Model - string length validation' => sub {
+        subtest 'Durance::Model - string length validation' => sub {
             package MyApp::Model::app::ShortName;
-            use ORM::Model 'ORM::Model', '-signatures';
+            use Durance::Model 'Durance::Model', '-signatures';
 
             column id   => (is => 'rw', isa => 'Int', primary_key => 1);
             column code => (is => 'rw', isa => 'Str', length => 5);
@@ -1656,9 +1656,9 @@ if (0) {
             like($died, qr/exceeds maximum length of 5/, 'value exceeding length rejected');
         };
 
-        subtest 'ORM::Model - Bool coercion' => sub {
+        subtest 'Durance::Model - Bool coercion' => sub {
             package MyApp::Model::app::Flags;
-            use ORM::Model 'ORM::Model', '-signatures';
+            use Durance::Model 'Durance::Model', '-signatures';
 
             column id      => (is => 'rw', isa => 'Int', primary_key => 1);
             column enabled => (is => 'rw', isa => 'Bool', default => 1);

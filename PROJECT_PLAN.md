@@ -14,21 +14,21 @@ and auto-timestamps.
 **Test Suite:** 15 test suites, ALL PASSING
 
 ```
-ok 1 - ORM::DB - attributes and methods
-ok 2 - ORM::Schema - constructor and attributes
-ok 3 - ORM::Schema - DDL generation
-ok 4 - ORM::Schema - table introspection
-ok 5 - ORM::Schema - table creation and migration
-ok 6 - ORM::Model - CRUD operations
-ok 7 - ORM::Model - Error handling
-ok 8 - ORM::Model - Auto-timestamps
-ok 9 - ORM::Model - Complex ResultSet Queries
-ok 10 - ORM::Model - Relationship functions
-ok 11 - ORM::Model - JOIN Support
-ok 12 - ORM::Model - Validation functions
-ok 13 - ORM::Schema - Schema Validation
-ok 14 - ORM::ResultSet - JOIN Validation
-ok 15 - ORM::Model - Basic attributes
+ok 1 - Durance::DB - attributes and methods
+ok 2 - Durance::Schema - constructor and attributes
+ok 3 - Durance::Schema - DDL generation
+ok 4 - Durance::Schema - table introspection
+ok 5 - Durance::Schema - table creation and migration
+ok 6 - Durance::Model - CRUD operations
+ok 7 - Durance::Model - Error handling
+ok 8 - Durance::Model - Auto-timestamps
+ok 9 - Durance::Model - Complex ResultSet Queries
+ok 10 - Durance::Model - Relationship functions
+ok 11 - Durance::Model - JOIN Support
+ok 12 - Durance::Model - Validation functions
+ok 13 - Durance::Schema - Schema Validation
+ok 14 - Durance::ResultSet - JOIN Validation
+ok 15 - Durance::Model - Basic attributes
 1..15
 ```
 
@@ -48,7 +48,7 @@ ok 15 - ORM::Model - Basic attributes
 
 ## Public API Reference
 
-### ORM::Model
+### Durance::Model
 
 **Class Methods:**
 - `create($data)` - Insert new record, returns model instance
@@ -61,7 +61,7 @@ ok 15 - ORM::Model - Basic attributes
 - `column_meta($col)` - Metadata hash for a column
 - `primary_key` - Primary key column name (default: 'id')
 - `table` - Table name
-- `db` - ORM::DB instance (class-level cached, convention-derived)
+- `db` - Durance::DB instance (class-level cached, convention-derived)
 - `validations($name)` - Validation rules for a column
 - `schema_name` - Schema name extracted from package
 - `attributes` - Alias for columns
@@ -78,7 +78,7 @@ ok 15 - ORM::Model - Basic attributes
 - `delete` - Delete record
 - `to_hash` - Hashref of data (excludes db reference)
 
-### ORM::DB
+### Durance::DB
 
 **Attributes:** `dsn` (lazy), `username` (ro), `password` (ro),
 `driver_options` (lazy)
@@ -88,7 +88,7 @@ ok 15 - ORM::Model - Basic attributes
 - `disconnect_all` - Disconnects all pooled handles
 - `isDSNValid` - Validates DSN by attempting connection
 
-### ORM::ResultSet
+### Durance::ResultSet
 
 **Attributes:** `class` (ro, required), `conditions` (rw),
 `order_by` (rw), `limit_val` (rw), `offset_val` (rw),
@@ -104,7 +104,7 @@ ok 15 - ORM::Model - Basic attributes
 - `first` - Execute with LIMIT 1, return first result
 - `count` - Execute COUNT(*) query
 
-### ORM::Schema
+### Durance::Schema
 
 **Attributes:** `dbh`, `model_class`, `driver`, `logger`
 
@@ -122,7 +122,7 @@ ok 15 - ORM::Model - Basic attributes
 - `pending_changes($model)` - Report schema differences
 - `get_all_models_for_app($app)` - Discover all model classes
 
-### ORM::DSL
+### Durance::DSL
 
 **Exported Functions:**
 - `column $name => (%opts)` - Define a column with metadata
@@ -131,7 +131,7 @@ ok 15 - ORM::Model - Basic attributes
 - `belongs_to $name => (%opts)` - Define belongs-to relationship
 - `validates $name => (%opts)` - Define validation rules
 
-### ORM::Logger
+### Durance::Logger
 
 **Methods:**
 - `log($message)` - Log message to STDERR with timestamp and PID
@@ -146,8 +146,8 @@ ok 15 - ORM::Model - Basic attributes
 ```perl
 package MyApp::Model::User;
 use Moo;
-extends 'ORM::Model';
-use ORM::DSL;
+extends 'Durance::Model';
+use Durance::DSL;
 
 tablename 'users';
 
@@ -179,18 +179,18 @@ $user->delete;
 
 | Category | Subtest Count | Description |
 |----------|---------------|-------------|
-| ORM::DB attributes | 6 | dsn, username, password, driver_options |
-| ORM::DB dbh | 3 | Connection, prepare, driver detection |
-| ORM::DB handle pooling | 2 | Same handle returned, ping |
-| ORM::DB disconnect_all | 2 | Connect/disconnect lifecycle |
-| ORM::DB isDSNValid | 5 | Valid/invalid DSN, error messages |
-| ORM::Schema constructor | 5 | Object creation, driver detection, override |
-| ORM::Schema DDL | 17 | SQLite DDL, MySQL DDL, type mapping |
-| ORM::Schema introspection | 2 | table_exists, table_info for missing tables |
-| ORM::Schema migration | 13 | create_table, pending_changes, sync_table |
-| ORM::Model CRUD | 26 | Instantiation, create, find, update, delete, ResultSet |
-| ORM::Model errors | 4 | find undef, update/delete without pk, invalid DSN |
-| ORM::Model timestamps | 5 | created_at, updated_at auto-set and skip |
+| Durance::DB attributes | 6 | dsn, username, password, driver_options |
+| Durance::DB dbh | 3 | Connection, prepare, driver detection |
+| Durance::DB handle pooling | 2 | Same handle returned, ping |
+| Durance::DB disconnect_all | 2 | Connect/disconnect lifecycle |
+| Durance::DB isDSNValid | 5 | Valid/invalid DSN, error messages |
+| Durance::Schema constructor | 5 | Object creation, driver detection, override |
+| Durance::Schema DDL | 17 | SQLite DDL, MySQL DDL, type mapping |
+| Durance::Schema introspection | 2 | table_exists, table_info for missing tables |
+| Durance::Schema migration | 13 | create_table, pending_changes, sync_table |
+| Durance::Model CRUD | 26 | Instantiation, create, find, update, delete, ResultSet |
+| Durance::Model errors | 4 | find undef, update/delete without pk, invalid DSN |
+| Durance::Model timestamps | 5 | created_at, updated_at auto-set and skip |
 | Complex ResultSet | 16 | Comparison ops, LIKE, multi-condition, multi-order, DESC, offset |
 | Relationships | 7 | has_many, belongs_to, query, create_* |
 | JOIN Support | 8 | Introspection, chaining, belongs_to/has_many JOINs, WHERE, overrides |
@@ -210,26 +210,26 @@ Converted all ORM modules from `Mojo::Base` to `Moo`.
 | Change | Before | After |
 |--------|--------|-------|
 | OO Framework | `Mojo::Base` | `Moo` |
-| Model Definition | `use base ORM::Model` | `use Moo; extends 'ORM::Model'` |
-| DSL Import | automatic via import | `use ORM::DSL;` |
+| Model Definition | `use base Durance::Model` | `use Moo; extends 'Durance::Model'` |
+| DSL Import | automatic via import | `use Durance::DSL;` |
 
 **Commits:** 5e8d92f, a36715d, 0ec6454
 
 ### 2. DSL Module Extraction ✓
 
-Extracted DSL functions from ORM::Model into a separate ORM::DSL module.
-Originally created as `ORM::Model::DSL`, then renamed to `ORM::DSL` for
+Extracted DSL functions from Durance::Model into a separate Durance::DSL module.
+Originally created as `Durance::Model::DSL`, then renamed to `Durance::DSL` for
 a cleaner user-facing API.
 
 **Problem:** Moo's `extends` does NOT call the parent's `import` method,
 so DSL functions (column, tablename, etc.) were never installed in
 subclasses.
 
-**Solution:** Separate `ORM::DSL` module with explicit `use ORM::DSL;`.
+**Solution:** Separate `Durance::DSL` module with explicit `use Durance::DSL;`.
 
 ### 3. Database Connection Refactor ✓
 
-Replaced the complex `dbh` method in ORM::Model with a cleaner `db`
+Replaced the complex `dbh` method in Durance::Model with a cleaner `db`
 attribute pattern.
 
 | Change | Before | After |
@@ -250,7 +250,7 @@ attribute pattern.
 columns are dynamically created methods, so `$model->new(name => 'bob')`
 would leave `name` as undef.
 
-**Solution:** Added `BUILD` hook to ORM::Model that copies DSL column
+**Solution:** Added `BUILD` hook to Durance::Model that copies DSL column
 values from constructor args into `$self->{hash}`.
 
 ### 5. Comprehensive Test Suite ✓
@@ -259,10 +259,10 @@ Built iterative test coverage across 4 phases:
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 1 | ORM::DB (connection, pooling, disconnect) | ✓ COMPLETED |
-| 2 | ORM::Schema (DDL, introspection, migration) | ✓ COMPLETED |
+| 1 | Durance::DB (connection, pooling, disconnect) | ✓ COMPLETED |
+| 2 | Durance::Schema (DDL, introspection, migration) | ✓ COMPLETED |
 | 3 | Test models and migration logic | ✓ COMPLETED |
-| 4 | ORM::Model CRUD, ResultSet, relationships | ✓ COMPLETED |
+| 4 | Durance::Model CRUD, ResultSet, relationships | ✓ COMPLETED |
 
 Additional test coverage added for:
 - Error handling (find undef, update/delete without pk, invalid DSN)
@@ -274,7 +274,7 @@ Additional test coverage added for:
 
 ### 6. isDSNValid() Method ✓
 
-Added explicit DSN validation method to ORM::DB. Connects using
+Added explicit DSN validation method to Durance::DB. Connects using
 `DBI->connect()` to test, provides clean error reporting, always
 disconnects after testing.
 
@@ -286,13 +286,13 @@ Added SQL JOIN support to the ORM so related data can be fetched in a
 single query, reducing N+1 query problems.
 
 **Implementation:**
-- Added relationship introspection methods to ORM::Model:
+- Added relationship introspection methods to Durance::Model:
   `has_many_relations`, `belongs_to_relations`, `related_to`
 - Added `add_joins()` method and `join_specs` attribute to
-  ORM::ResultSet
+  Durance::ResultSet
 - Built JOIN SQL generation in `ResultSet->all()` supporting both
   `belongs_to` and `has_many` relationship types
-- Tagged relationships with `_relationship_type` in ORM::DSL
+- Tagged relationships with `_relationship_type` in Durance::DSL
 - Fixed `has_many` foreign key default to derive from parent class name
   (e.g., `Company has_many employees` -> `company_id`, not
   `employees_id`)
@@ -325,7 +325,7 @@ joins.
 Added explicit schema validation methods and JOIN validation to improve
 developer experience and catch errors early.
 
-**Schema Validation (ORM::Schema):**
+**Schema Validation (Durance::Schema):**
 - `schema_valid($model)` - Returns boolean (scalar) or
   `($valid, \@changes)` (list context). Does not modify the database.
 - `ensure_schema_valid($model)` - Dies with actionable error message
@@ -333,7 +333,7 @@ developer experience and catch errors early.
 - Recommended for app startup in long-running web frameworks
   (Mojolicious, Catalyst, Dancer). Not recommended for CGI.
 
-**JOIN Validation (ORM::ResultSet):**
+**JOIN Validation (Durance::ResultSet):**
 - `add_joins()` now validates string relationship names immediately.
   Invalid names die with error listing available relationships.
 - Hash ref overrides are not validated (trusted as explicit/advanced).
@@ -365,7 +365,7 @@ developer experience and catch errors early.
 | Decision | Rationale |
 |----------|-----------|
 | Moo over Moose | Lightweight, no XS dependency |
-| Separate ORM::DSL module | Works with Moo's extends (no import magic) |
+| Separate Durance::DSL module | Works with Moo's extends (no import magic) |
 | Convention over configuration | DB class auto-derived from model package name |
 | Class-level DB caching | Prevents N+1 connection problems |
 | BUILD hook for DSL columns | Integrates dynamic columns with Moo constructor |
@@ -403,10 +403,10 @@ and performance analysis. Built with Test-Driven Development approach.
 
 **Requirements Fulfilled:**
 - ✅ Log to STDERR via `ORM_SQL_LOGGING=1` environment variable
-- ✅ Single `ORM::Logger` class with one `log()` method
+- ✅ Single `Durance::Logger` class with one `log()` method
 - ✅ Log exact SQL statements with parameter values (for copy-paste debugging)
 - ✅ Include timing information mixed with output for context
-- ✅ Single logger attribute on ORM::Model, ORM::ResultSet, ORM::Schema
+- ✅ Single logger attribute on Durance::Model, Durance::ResultSet, Durance::Schema
 - ✅ Subclassable: users can override `_build_logger` for custom implementations
 - ✅ Each module uses Time::HiRes independently as needed
 
@@ -419,22 +419,22 @@ and performance analysis. Built with Test-Driven Development approach.
 **Files Modified:**
 - `lib/ORM/Model.pm` - Added logger attribute, wrapped find/all/insert/update/delete
 - `lib/ORM/ResultSet.pm` - Added logger attribute, wrapped all/count methods
-- `lib/ORM/Schema.pm` - Replaced custom logger with ORM::Logger, wrapped DDL operations
+- `lib/ORM/Schema.pm` - Replaced custom logger with Durance::Logger, wrapped DDL operations
 
 **Sub-Tasks Completed:**
 - ✅ Step 1: Created comprehensive test suite in `t/logger.t`
-- ✅ Step 2: Created ORM::Logger module with log() method
-- ✅ Step 3: Added logger attribute to ORM::Model
-- ✅ Step 4: Added SQL logging to ORM::Model::find()
-- ✅ Step 5: Added SQL logging to ORM::Model::all()
-- ✅ Step 6: Added SQL logging to ORM::Model::insert()
-- ✅ Step 7: Added SQL logging to ORM::Model::update()
-- ✅ Step 8: Added SQL logging to ORM::Model::delete()
-- ✅ Step 9: Added logger attribute to ORM::ResultSet
-- ✅ Step 10: Added SQL logging to ORM::ResultSet::all()
-- ✅ Step 11: Added SQL logging to ORM::ResultSet::count()
-- ✅ Step 12: Replaced ORM::Schema logger with ORM::Logger
-- ✅ Step 13: Added SQL logging to ORM::Schema DDL operations (CREATE TABLE, ALTER TABLE)
+- ✅ Step 2: Created Durance::Logger module with log() method
+- ✅ Step 3: Added logger attribute to Durance::Model
+- ✅ Step 4: Added SQL logging to Durance::Model::find()
+- ✅ Step 5: Added SQL logging to Durance::Model::all()
+- ✅ Step 6: Added SQL logging to Durance::Model::insert()
+- ✅ Step 7: Added SQL logging to Durance::Model::update()
+- ✅ Step 8: Added SQL logging to Durance::Model::delete()
+- ✅ Step 9: Added logger attribute to Durance::ResultSet
+- ✅ Step 10: Added SQL logging to Durance::ResultSet::all()
+- ✅ Step 11: Added SQL logging to Durance::ResultSet::count()
+- ✅ Step 12: Replaced Durance::Schema logger with Durance::Logger
+- ✅ Step 13: Added SQL logging to Durance::Schema DDL operations (CREATE TABLE, ALTER TABLE)
 
 **Test Results:**
 - ✅ All 15 original test suites PASSING
@@ -476,7 +476,7 @@ method now respects JOIN specifications and applies DISTINCT when needed.
 - ✅ Relationship type auto-detected (belongs_to vs has_many)
 - ✅ belongs_to: uses simple COUNT(*) (one row per match)
 - ✅ has_many: uses COUNT(DISTINCT main_table.id) to avoid duplicates
-- ✅ SQL logging support (via ORM::Logger with timing)
+- ✅ SQL logging support (via Durance::Logger with timing)
 - ✅ COUNT works with WHERE conditions and JOINs combined
 
 **Implementation (Test-Driven Development):**
@@ -555,7 +555,7 @@ SELECT COUNT(*) FROM published_books LEFT JOIN publishers ... LEFT JOIN authors 
 
 **Status: DEFERRED** - No immediate use case identified.
 
-Given that `ORM::Schema::pending_changes()` already shows what schema changes
+Given that `Durance::Schema::pending_changes()` already shows what schema changes
 would happen, and users can review changes via this method before applying them,
 dry-run mode lacks a compelling real-world use case.
 
@@ -563,12 +563,12 @@ Can be revisited if users request it in the future.
 
 ### 10. Extract all_relations() for Code Reuse ✓ IN PROGRESS
 
-Unified relationship-gathering logic into `ORM::Model->all_relations()` to
+Unified relationship-gathering logic into `Durance::Model->all_relations()` to
 avoid duplication and prepare for additional relationship types like
 `has_one`.
 
 **Implementation:**
-- `all_relations()` already exists in ORM::Model (returns hash with relationship
+- `all_relations()` already exists in Durance::Model (returns hash with relationship
   names as keys and types as values: `{ name => 'has_many', ... }`)
 - Handles random hash key ordering by using `sort keys` in error messages
   (ResultSet.pm:34)
@@ -590,11 +590,11 @@ requirements and Single Responsibility Principle.
 
 | Module | Responsibilities | SRP Status |
 |--------|------------------|------------|
-| ORM::DB | 2 | ✓ Compliant |
-| ORM::DSL | 5 | ✗ Violation |
-| ORM::Model | 8 | ✗✗ God Object |
-| ORM::ResultSet | 3 | ✗ Violation |
-| ORM::Schema | 7 | ✗✗ Violation |
+| Durance::DB | 2 | ✓ Compliant |
+| Durance::DSL | 5 | ✗ Violation |
+| Durance::Model | 8 | ✗✗ God Object |
+| Durance::ResultSet | 3 | ✗ Violation |
+| Durance::Schema | 7 | ✗✗ Violation |
 
 **Framework Requirements Met: 67% (6/9)**
 - ✅ Lightweight
@@ -606,10 +606,10 @@ requirements and Single Responsibility Principle.
 - ⏸️ **Dry-run mode for migrations** (DEFERRED - No real-world use case)
 
 **SRP Violations Identified:**
-- ORM::Model (8 responsibilities) - CRITICAL God Object
-- ORM::Schema (7 responsibilities) - Mixed concerns
-- ORM::DSL (5 responsibilities) - Definition + SQL generation
-- ORM::ResultSet (3 responsibilities) - State + SQL gen + execution
+- Durance::Model (8 responsibilities) - CRITICAL God Object
+- Durance::Schema (7 responsibilities) - Mixed concerns
+- Durance::DSL (5 responsibilities) - Definition + SQL generation
+- Durance::ResultSet (3 responsibilities) - State + SQL gen + execution
 
 **Deliverables Generated:**
 - `ANALYSIS_EXECUTIVE_SUMMARY.txt` - Leadership summary
@@ -620,7 +620,7 @@ requirements and Single Responsibility Principle.
 
 **Refactoring Roadmap Created:**
 - Phase 1: Add dry-run mode + SQL logging (56% → 78% compliance)
-- Phase 2: Extract query builder + split ORM::Model (improve SRP)
+- Phase 2: Extract query builder + split Durance::Model (improve SRP)
 - Phase 3: Refactor DSL + deduplicate code
 
 Estimated effort: 50-60 hours over 6 weeks
@@ -636,8 +636,8 @@ modules.
 - Actual coverage: 37/46 (80%) across all modules
 
 **Methods Previously Untested:**
-- `ORM::Schema::column_info()` - Returns column metadata from database
-- `ORM::Model::validations()` - Retrieves validation rules for a column
+- `Durance::Schema::column_info()` - Returns column metadata from database
+- `Durance::Model::validations()` - Retrieves validation rules for a column
 
 **Implementation:**
 - Added subtest `column_info returns metadata from existing table`
@@ -658,11 +658,11 @@ modules.
 - Framework API comprehensively exercised
 
 **Coverage by Module:**
-- ORM::Model: 22/23 methods tested (96%)
-- ORM::Schema: 11/12 methods tested (92%)
-- ORM::ResultSet: 8/8 methods tested (100%)
-- ORM::DB: 3/3 methods tested (100%)
-- ORM::DSL: 5/5 functions tested (100%)
+- Durance::Model: 22/23 methods tested (96%)
+- Durance::Schema: 11/12 methods tested (92%)
+- Durance::ResultSet: 8/8 methods tested (100%)
+- Durance::DB: 3/3 methods tested (100%)
+- Durance::DSL: 5/5 functions tested (100%)
 
 ### Previously Completed Tasks
 
@@ -708,7 +708,7 @@ that users explicitly enable when they want to pre-load related records efficien
 - ✅ Store preloaded data in model instances
 - ✅ Subsequent relationship accessors use cached data (no extra queries)
 - ✅ Support multiple preloads: `->preload('posts', 'comments')`
-- ✅ SQL logging support (via ORM::Logger)
+- ✅ SQL logging support (via Durance::Logger)
 - ✅ Chain with other methods: `->where(...)->preload(...)->all()`
 - ✅ No breaking changes to existing API
 
@@ -762,8 +762,8 @@ that users explicitly enable when they want to pre-load related records efficien
 # Model definitions
 package MyApp::Model::User;
 use Moo;
-extends 'ORM::Model';
-use ORM::DSL;
+extends 'Durance::Model';
+use Durance::DSL;
 
 tablename 'users';
 column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -775,8 +775,8 @@ belongs_to company => (is => 'rw', isa => 'MyApp::Model::Company');
 
 package MyApp::Model::Post;
 use Moo;
-extends 'ORM::Model';
-use ORM::DSL;
+extends 'Durance::Model';
+use Durance::DSL;
 
 tablename 'posts';
 column id      => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -872,6 +872,79 @@ for my $user (@users) {
 | Feature | Description | Priority | Reason |
 |---------|-------------|----------|--------|
 | Dry-run mode | Report SQL without executing | Medium | No real-world use case; pending_changes() covers schema review |
+
+---
+
+## Project Rename: ORM → Durance
+
+### Task: Rename project namespace from ORM to Durance
+
+**Objective:** Rename the project from "ORM" to "Durance" and change all `lib/ORM/` namespace to `Durance::`.
+
+**Scope:**
+- `lib/ORM/` → `lib/Durance/`
+- 6 Perl modules: Model.pm, ResultSet.pm, DSL.pm, Schema.pm, Logger.pm, DB.pm
+- All test files referencing Durance:: modules
+- Documentation (AGENTS.md, PROJECT_PLAN.md, POD)
+
+**Implementation Plan:**
+
+**Step 1: Rename lib/ORM/ directory to lib/Durance/**
+- [ ] `mv lib/ORM lib/Durance`
+
+**Step 2: Update package declarations in all modules**
+- [ ] `lib/Durance/DB.pm` - `package Durance::DB;`
+- [ ] `lib/Durance/Model.pm` - `package Durance::Model;`
+- [ ] `lib/Durance/ResultSet.pm` - `package Durance::ResultSet;`
+- [ ] `lib/Durance/DSL.pm` - `package Durance::DSL;`
+- [ ] `lib/Durance/Schema.pm` - `package Durance::Schema;`
+- [ ] `lib/Durance/Logger.pm` - `package Durance::Logger;`
+
+**Step 3: Update internal references in module files**
+- [ ] All `Durance::` references → `Durance::` within module code
+- [ ] Update `our` package variables: `%_has_many`, `%_belongs_to`, etc.
+
+**Step 4: Update test files**
+- [ ] `t/orm.t` - Update all require/use statements and package references
+- [ ] `t/logger.t` - Update all require/use statements
+- [ ] `t/count_with_join.t` - Update all require/use statements
+- [ ] `t/has_one.t` - Update all require/use statements
+- [ ] `t/preload.t` - Update all require/use statements
+
+**Step 5: Update documentation**
+- [ ] `AGENTS.md` - Update references and directory structure
+- [ ] `PROJECT_PLAN.md` - Update all Durance:: references to Durance::
+
+**Step 6: Update example models (if any)**
+- [ ] `t/MyApp/Model/*` - Update extends from 'Durance::Model' to 'Durance::Model'
+
+**Step 7: Run tests and verify**
+- [ ] `prove -l t/*.t` - All tests pass
+- [ ] Fix any namespace issues discovered during testing
+
+**Example Changes:**
+
+Before:
+```perl
+package MyApp::Model::User;
+use Moo;
+extends 'Durance::Model';
+use Durance::DSL;
+
+my $user = MyApp::Model::User->create({ name => 'John' });
+```
+
+After:
+```perl
+package MyApp::Model::User;
+use Moo;
+extends 'Durance::Model';
+use Durance::DSL;
+
+my $user = MyApp::Model::User->create({ name => 'John' });
+```
+
+**Effort Estimate:** 1-2 hours
 
 ---
 

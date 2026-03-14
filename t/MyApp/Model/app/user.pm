@@ -1,8 +1,8 @@
 # All code copyright Joe Johnston <jjohn@taskboy.com> 2026
 package MyApp::Model::app::user;
 use Moo;
-extends 'ORM::Model';
-use ORM::DSL;
+extends 'Durance::Model';
+use Durance::DSL;
 
 tablename 'users';
 

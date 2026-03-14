@@ -1,5 +1,5 @@
 # All code copyright Joe Johnston <jjohn@taskboy.com> 2026
-package ORM::ResultSet;
+package Durance::ResultSet;
 use strict;
 use warnings;
 use experimental 'signatures';
@@ -16,8 +16,8 @@ has 'preload_specs' => (is => 'rw', default => sub { [] });
 
 has 'logger' => (is => 'lazy');
 sub _build_logger ($self) {
-    require ORM::Logger;
-    return ORM::Logger->new;
+    require Durance::Logger;
+    return Durance::Logger->new;
 }
 
 sub add_joins ($self, @relations) {
@@ -158,7 +158,7 @@ sub all ($self) {
     my $duration = (time() - $start) * 1000;
     
     if ($ENV{ORM_SQL_LOGGING}) {
-        my $logger = ORM::Logger->new;
+        my $logger = Durance::Logger->new;
         my $params_str = @bind_values ? '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @bind_values) . ']' : '';
         $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $sql $params_str");
     }
@@ -208,7 +208,7 @@ sub _eager_load ($self, $rows) {
             my $duration = (time() - $start) * 1000;
 
             if ($ENV{ORM_SQL_LOGGING}) {
-                my $logger = ORM::Logger->new;
+                my $logger = Durance::Logger->new;
                 my $params_str = @parent_ids ? '[' . join(', ', @parent_ids) . ']' : '';
                 $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): PRELOAD $rel_name $sql $params_str");
             }
@@ -239,7 +239,7 @@ sub _eager_load ($self, $rows) {
             my $duration = (time() - $start) * 1000;
 
             if ($ENV{ORM_SQL_LOGGING}) {
-                my $logger = ORM::Logger->new;
+                my $logger = Durance::Logger->new;
                 my $params_str = @parent_ids ? '[' . join(', ', @parent_ids) . ']' : '';
                 $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): PRELOAD $rel_name $sql $params_str");
             }
@@ -276,7 +276,7 @@ sub _eager_load ($self, $rows) {
             my $duration = (time() - $start) * 1000;
 
             if ($ENV{ORM_SQL_LOGGING}) {
-                my $logger = ORM::Logger->new;
+                my $logger = Durance::Logger->new;
                 my $params_str = @rel_ids ? '[' . join(', ', @rel_ids) . ']' : '';
                 $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): PRELOAD $rel_name $sql $params_str");
             }
@@ -463,7 +463,7 @@ sub count ($self) {
     my $duration = (time() - $start) * 1000;
     
     if ($ENV{ORM_SQL_LOGGING}) {
-        my $logger = ORM::Logger->new;
+        my $logger = Durance::Logger->new;
         my $params_str = @bind_values ? '[' . join(', ', map { !defined $_ ? 'NULL' : /^\d+$/ ? $_ : "'$_'" } @bind_values) . ']' : '';
         $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): $sql $params_str");
     }
@@ -480,7 +480,7 @@ __END__
 
 =head1 NAME
 
-ORM::ResultSet - Result set for chainable queries
+Durance::ResultSet - Result set for chainable queries
 
 =head1 SYNOPSIS
 
@@ -503,7 +503,7 @@ ORM::ResultSet - Result set for chainable queries
 
 =head1 DESCRIPTION
 
-ORM::ResultSet provides chainable query methods for ORM models.
+Durance::ResultSet provides chainable query methods for ORM models.
 It lazily executes queries until methods like C<all>, C<first>, or C<count> are called.
 
 =head1 ATTRIBUTES

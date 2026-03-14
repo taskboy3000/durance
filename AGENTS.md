@@ -18,7 +18,7 @@ This project implements an Object Relational Mapper in Perl that has a similar w
 * It should require as few external non-core Perl modules as possible
 * The framework should favor Convention of Configuration (https://en.wikipedia.org/wiki/Convention_over_configuration)
 * The framework should provide optional verbose logging when making SQL queries.  The raw SQL query before the execution should be logged.  The time it takes to execute a statement needs to be logged as well
-* The creation and updating of SQL tables is done through introspect of an Application's models.  That is to say the framework needs a way that given a base perl package name, it can find all of an app's models.  (This will take some designing to get right, but ORM::Schema has a good start on this)
+* The creation and updating of SQL tables is done through introspect of an Application's models.  That is to say the framework needs a way that given a base perl package name, it can find all of an app's models.  (This will take some designing to get right, but Durance::Schema has a good start on this)
 * The documentation should be embedded in the Perl Modules as POD
 
 ## Planning Workflow
@@ -93,7 +93,7 @@ perl -Ilib -wc lib/ORM/Model.pm
 - Always use `use strict;` and `use warnings;` at the top of every file
 - Always use `use experimental ('signatures');` at the top of every Perl module and Perl test file
 - Use Moo for OO perl  modules: `use Moo;`
-- Subclasses of this framework should only need `use Moo; extends 'ORM::Model';` or `use Moo; extends 'ORM::DB';`
+- Subclasses of this framework should only need `use Moo; extends 'Durance::Model';` or `use Moo; extends 'Durance::DB';`
 - If a module needs a helper function or method that does not need to be exposed to the user, those functions will start with an underscore like `_parse_dsn`.
 - Take advantage of lazy initialized attributes when designing classs.  This is a core Moo feature that saves memory.
 - Use attribute builders in Moo classes so that subclass can override values using `sub _build_attribute ($self) { return 'attr_value' }`
@@ -103,10 +103,10 @@ perl -Ilib -wc lib/ORM/Model.pm
 - The framework should allow for a "dryrun mode" where the framework will report what SQL it would have executued or what DB changes would happen if a migration were run
 - The framework should provide a single method to migrate all of an applications models
 - The framework should write SQL that matches the ANSI standard as much as possible.  Exceptions to this rule include AUTO_INCREMENT for `id` columns
-- Classes in the ORM:: namespace should prefer `has-a` relationships to `is-a`.  Subclasses of ORM::Model have reference to the subclasses `ORM::DB` module for that user's application.
+- Classes in the Durance:: namespace should prefer `has-a` relationships to `is-a`.  Subclasses of Durance::Model have reference to the subclasses `Durance::DB` module for that user's application.
 
 ### Naming Conventions
-- **Packages/Modules**: UpperCamelCase (e.g., `ORM::Base`, `MyApp::Model::User`)
+- **Packages/Modules**: UpperCamelCase (e.g., `Durance::Base`, `MyApp::Model::User`)
 - **Methods/Subroutines**: lowerCamelCase (e.g., `createTable`, `tableExists`)
 - **Attributes**: snake_case (e.g., `dbname`, `primary_key`)
 - **Constants**: UPPER_SNAKE_CASE (e.g., `COLUMN_META`)
@@ -128,7 +128,7 @@ sub methodName ($self, @args) {
 1;
 =pod
 
-=head1 ORM::Class
+=head1 Durance::Class
 
 ...
 
@@ -177,7 +177,7 @@ my $dbh = $self->dbh // die 'No database handle';
 ```perl
 use Test2::V0;
 
-subtest 'ORM::Base - CRUD' => sub {
+subtest 'Durance::Base - CRUD' => sub {
     my $user = MyApp::Model::User->create({ name => 'Test' });
     ok($user->id, 'id generated');
     is($user->name, 'Test', 'name set');
@@ -188,7 +188,7 @@ subtest 'ORM::Base - CRUD' => sub {
 ```perl
 package MyApp::Model::Entity;
 use Moo;
-extend 'ORM::Model';
+extend 'Durance::Model';
 
 column id         => (is => 'rw', isa => 'Int', primary_key => 1); # managed by the ORM
 column name       => (is => 'rw', isa => 'Str', required => 1);

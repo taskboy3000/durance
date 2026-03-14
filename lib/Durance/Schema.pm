@@ -1,5 +1,5 @@
 # All code copyright Joe Johnston <jjohn@taskboy.com> 2026
-package ORM::Schema;
+package Durance::Schema;
 use strict;
 use warnings;
 use experimental 'signatures';
@@ -17,8 +17,8 @@ has 'driver' => (is => 'rw');
 has 'logger' => (is => 'lazy');
 
 sub _build_logger ($self) {
-    require ORM::Logger;
-    return ORM::Logger->new;
+    require Durance::Logger;
+    return Durance::Logger->new;
 }
 
 my %TYPE_MAP = (
@@ -429,7 +429,7 @@ sub ensure_schema_valid ( $self, $modelOrClass ) {
     die "Schema validation failed for '$class':\n"
       . "$change_list\n\n"
       . "To fix this model, run:\n"
-      . "  my \$schema = ORM::Schema->new(dbh => \$dbh);\n"
+      . "  my \$schema = Durance::Schema->new(dbh => \$dbh);\n"
       . "  \$schema->sync_table('$class');\n\n"
       . "Or to migrate all models at once:\n"
       . "  \$schema->migrate_all('${app_name}::DB');\n";
@@ -483,14 +483,14 @@ __END__
 
 =head1 NAME
 
-ORM::Schema - Schema manager for ORM models
+Durance::Schema - Schema manager for ORM models
 
 =head1 SYNOPSIS
 
-    use ORM::Schema;
+    use Durance::Schema;
     use MyApp::Model::User;
 
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
     $schema->create_table_for_class('MyApp::Model::User');
 
     # Inspect DDL without executing
@@ -499,7 +499,7 @@ ORM::Schema - Schema manager for ORM models
 
 =head1 DESCRIPTION
 
-ORM::Schema manages database tables based on ORM model definitions.
+Durance::Schema manages database tables based on ORM model definitions.
 It supports multiple database systems (SQLite and MySQL/MariaDB) by
 generating dialect-specific DDL from model column definitions.
 
@@ -624,7 +624,7 @@ this per-request in CGI environments where startup cost matters.
 
     # In a Mojolicious startup() method:
     sub startup ($self) {
-        my $schema = ORM::Schema->new(dbh => $dbh);
+        my $schema = Durance::Schema->new(dbh => $dbh);
         $schema->ensure_schema_valid('MyApp::Model::User');
         $schema->ensure_schema_valid('MyApp::Model::Post');
         # ... rest of startup
@@ -639,10 +639,10 @@ available, also reports type mismatches.
 
 =head1 MULTI-DATABASE SUPPORT
 
-ORM::Schema detects the database driver from the DBI handle and
+Durance::Schema detects the database driver from the DBI handle and
 generates appropriate DDL. You can also override the driver explicitly:
 
-    my $schema = ORM::Schema->new(dbh => $dbh, driver => 'mysql');
+    my $schema = Durance::Schema->new(dbh => $dbh, driver => 'mysql');
 
 Supported drivers:
 
@@ -676,12 +676,12 @@ SQL::Translator, only missing columns are reported.
 
 =head1 EXAMPLE
 
-    use ORM::Schema;
+    use Durance::Schema;
     use MyApp::Model::User;
     use MyApp::DB;
 
     # Create schema manager with database handle
-    my $schema = ORM::Schema->new(dbh => MyApp::DB->dbh);
+    my $schema = Durance::Schema->new(dbh => MyApp::DB->dbh);
 
     # Check if table exists
     if (!$schema->table_exists(MyApp::Model::User->table)) {

@@ -12,15 +12,15 @@ use File::Basename;
 use lib dirname($FindBin::Bin) . '/lib';
 
 # Import ORM modules
-require ORM::Model;
-require ORM::Schema;
-require ORM::DSL;
-require ORM::DB;
+require Durance::Model;
+require Durance::Schema;
+require Durance::DSL;
+require Durance::DB;
 
 # Test database setup - creates temp file each time
 package TestDB;
 use Moo;
-extends 'ORM::DB';
+extends 'Durance::DB';
 use File::Temp qw(tempfile);
 
 has 'temp_file' => (is => 'lazy');
@@ -38,7 +38,7 @@ sub _build_dsn ($self) {
 # Test model base class
 package TestModel;
 use Moo;
-extends 'ORM::Model';
+extends 'Durance::Model';
 
 sub _db_class_for { return 'TestDB'; }
 
@@ -46,7 +46,7 @@ sub _db_class_for { return 'TestDB'; }
 package MyApp::Model::Author;
 use Moo;
 extends 'TestModel';
-use ORM::DSL;
+use Durance::DSL;
 
 tablename 'authors';
 column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -58,7 +58,7 @@ has_one profile => (is => 'rw', isa => 'MyApp::Model::AuthorProfile');
 package MyApp::Model::Book;
 use Moo;
 extends 'TestModel';
-use ORM::DSL;
+use Durance::DSL;
 
 tablename 'books';
 column id        => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -70,7 +70,7 @@ belongs_to author => (is => 'rw', isa => 'MyApp::Model::Author', foreign_key => 
 package MyApp::Model::AuthorProfile;
 use Moo;
 extends 'TestModel';
-use ORM::DSL;
+use Durance::DSL;
 
 tablename 'author_profiles';
 column id        => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -82,7 +82,7 @@ belongs_to author => (is => 'rw', isa => 'MyApp::Model::Author', foreign_key => 
 package MyApp::Model::Publisher;
 use Moo;
 extends 'TestModel';
-use ORM::DSL;
+use Durance::DSL;
 
 tablename 'publishers';
 column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -96,10 +96,10 @@ package main;
 # Test Suite: preload() Eager Loading
 # ============================================================================
 
-subtest 'ORM::Model - preload() Eager Loading' => sub {
+subtest 'Durance::Model - preload() Eager Loading' => sub {
     # Create schema
     my $dbh = TestDB->new->dbh;
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
 
     $schema->create_table($_) for (
         MyApp::Model::Author->new,
@@ -115,7 +115,7 @@ subtest 'ORM::Model - preload() Eager Loading' => sub {
         my $rs = MyApp::Model::Author->where({})->preload('books');
         
         ok($rs, 'preload returns result set');
-        ok($rs->isa('ORM::ResultSet'), 'Returns ORM::ResultSet');
+        ok($rs->isa('Durance::ResultSet'), 'Returns Durance::ResultSet');
         
         # Should be chainable
         my $rs2 = $rs->where({})->order('name');

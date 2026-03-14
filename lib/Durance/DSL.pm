@@ -1,25 +1,25 @@
 # All code copyright Joe Johnston <jjohn@taskboy.com> 2026
-package ORM::DSL;
+package Durance::DSL;
 use strict;
 use warnings;
 use experimental 'signatures';
 
 
-# Package variables from ORM::Model that we need to access
+# Package variables from Durance::Model that we need to access
 our ( %_has_many, %_has_one, %_belongs_to, %_validations );
 
 =pod
 
 =head1 NAME
 
-ORM::DSL - DSL functions for ORM models
+Durance::DSL - DSL functions for ORM models
 
 =head1 SYNOPSIS
 
     package MyApp::Model::User;
     use Moo;
-    extends 'ORM::Model';
-    use ORM::DSL;
+    extends 'Durance::Model';
+    use Durance::DSL;
     
     tablename 'users';
     
@@ -38,7 +38,7 @@ ORM::DSL - DSL functions for ORM models
 
 This module exports DSL functions for defining ORM models.
 
-Use this module after C<use Moo; extends 'ORM::Model'> to get the
+Use this module after C<use Moo; extends 'Durance::Model'> to get the
 column, tablename, has_many, belongs_to, and validates functions.
 
 =head1 FUNCTIONS
@@ -62,19 +62,19 @@ sub load_into {
         my %opts = @opts;
         my $pkg  = $caller;
 
-        # Store in both the package-specific hash AND ORM::Model for attribute lookup
+        # Store in both the package-specific hash AND Durance::Model for attribute lookup
         ${$caller . "::_columns"}->{$pkg} //= [];
         push @{ ${$caller . "::_columns"}->{$pkg} }, $name;
         
-        $ORM::Model::_columns{$pkg} //= [];
-        push @{$ORM::Model::_columns{$pkg}}, $name;
+        $Durance::Model::_columns{$pkg} //= [];
+        push @{$Durance::Model::_columns{$pkg}}, $name;
 
         # This is interesting in that it is a global registry 
         # of all columns defined in all the model packages
-        $ORM::Model::COLUMN_META{$pkg}{$name} = \%opts;
+        $Durance::Model::COLUMN_META{$pkg}{$name} = \%opts;
 
         if ( $opts{primary_key} ) {
-            $ORM::Model::_primary_key{$pkg} = $name;
+            $Durance::Model::_primary_key{$pkg} = $name;
         }
 
         my $is = $opts{is} // 'rw';
@@ -87,7 +87,7 @@ sub load_into {
                 my ( $self, $val ) = @_;
                 
                 # Look up validations at RUNTIME, not definition time
-                my $validations = $ORM::Model::_validations{$pkg}{$name} // {};
+                my $validations = $Durance::Model::_validations{$pkg}{$name} // {};
                 
                 # Check required validation BEFORE defined check
                 if (exists $validations->{required}
@@ -142,7 +142,7 @@ sub load_into {
     *{"${caller}::has_many"} = sub ($name, %opts) {
         my $pkg = caller;
 
-        # Interesting that the ORM::Model package maintains this association spec
+        # Interesting that the Durance::Model package maintains this association spec
         $_has_many{$pkg}{$name} = \%opts;
         
         # Tag with relationship type
@@ -277,7 +277,7 @@ sub load_into {
     # Export validates function
     *{"${caller}::validates"} = sub ($name, %opts) {
         my $pkg = caller;
-        $ORM::Model::_validations{$pkg}{$name} = \%opts;
+        $Durance::Model::_validations{$pkg}{$name} = \%opts;
         return;
     };
 }
@@ -290,8 +290,8 @@ sub load_into {
 
     package MyApp::Model::User;
     use Moo;
-    extends 'ORM::Model';
-    use ORM::DSL;
+    extends 'Durance::Model';
+    use Durance::DSL;
     
     tablename 'users';
     
@@ -312,6 +312,6 @@ sub load_into {
 
 =head1 SEE ALSO
 
-L<ORM::Model>
+L<Durance::Model>
 
 =cut

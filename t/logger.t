@@ -1,5 +1,5 @@
 #!/usr/bin/env perl
-# Test suite for ORM::Logger
+# Test suite for Durance::Logger
 
 use strict;
 use warnings;
@@ -9,25 +9,25 @@ use FindBin;
 use File::Basename;
 use lib dirname($FindBin::Bin) . '/lib';
 
-use ORM::Logger;
+use Durance::Logger;
 use Test2::V0;
 
-# Test ORM::Logger
-subtest 'ORM::Logger - Core Functionality' => sub {
-    my $logger = ORM::Logger->new;
-    ok($logger->isa('ORM::Logger'), 'Logger instantiates correctly');
+# Test Durance::Logger
+subtest 'Durance::Logger - Core Functionality' => sub {
+    my $logger = Durance::Logger->new;
+    ok($logger->isa('Durance::Logger'), 'Logger instantiates correctly');
 };
 
-subtest 'ORM::Logger - log() method exists' => sub {
-    my $logger = ORM::Logger->new;
+subtest 'Durance::Logger - log() method exists' => sub {
+    my $logger = Durance::Logger->new;
     ok($logger->can('log'), 'Logger has log() method');
 };
 
-subtest 'ORM::Logger - log() with ORM_SQL_LOGGING disabled' => sub {
+subtest 'Durance::Logger - log() with ORM_SQL_LOGGING disabled' => sub {
     # Ensure environment variable is not set
     local $ENV{ORM_SQL_LOGGING} = 0;
     
-    my $logger = ORM::Logger->new;
+    my $logger = Durance::Logger->new;
     
     # Capture STDERR to verify nothing is logged
     my $stderr_output = '';
@@ -43,10 +43,10 @@ subtest 'ORM::Logger - log() with ORM_SQL_LOGGING disabled' => sub {
     is($stderr_output, '', 'No output when ORM_SQL_LOGGING=0');
 };
 
-subtest 'ORM::Logger - log() with ORM_SQL_LOGGING enabled' => sub {
+subtest 'Durance::Logger - log() with ORM_SQL_LOGGING enabled' => sub {
     local $ENV{ORM_SQL_LOGGING} = 1;
     
-    my $logger = ORM::Logger->new;
+    my $logger = Durance::Logger->new;
     
     # Capture STDERR
     my $stderr_output = '';
@@ -65,10 +65,10 @@ subtest 'ORM::Logger - log() with ORM_SQL_LOGGING enabled' => sub {
     like($stderr_output, qr/\[\d+\]/, 'PID is logged');
 };
 
-subtest 'ORM::Logger - log() includes timestamp' => sub {
+subtest 'Durance::Logger - log() includes timestamp' => sub {
     local $ENV{ORM_SQL_LOGGING} = 1;
     
-    my $logger = ORM::Logger->new;
+    my $logger = Durance::Logger->new;
     
     my $stderr_output = '';
     open my $stderr_fh, '>', \$stderr_output or die "Cannot capture STDERR: $!";
@@ -84,10 +84,10 @@ subtest 'ORM::Logger - log() includes timestamp' => sub {
     like($stderr_output, qr/\d{1,2}:\d{2}:\d{2}/, 'Timestamp with HH:MM:SS included');
 };
 
-subtest 'ORM::Logger - log() includes PID' => sub {
+subtest 'Durance::Logger - log() includes PID' => sub {
     local $ENV{ORM_SQL_LOGGING} = 1;
     
-    my $logger = ORM::Logger->new;
+    my $logger = Durance::Logger->new;
     
     my $stderr_output = '';
     open my $stderr_fh, '>', \$stderr_output or die "Cannot capture STDERR: $!";
@@ -102,10 +102,10 @@ subtest 'ORM::Logger - log() includes PID' => sub {
     like($stderr_output, qr/\[$$\]/, 'Current process ID included in brackets');
 };
 
-subtest 'ORM::Logger - Multiple calls to log()' => sub {
+subtest 'Durance::Logger - Multiple calls to log()' => sub {
     local $ENV{ORM_SQL_LOGGING} = 1;
     
-    my $logger = ORM::Logger->new;
+    my $logger = Durance::Logger->new;
     
     my $stderr_output = '';
     open my $stderr_fh, '>', \$stderr_output or die "Cannot capture STDERR: $!";
@@ -129,10 +129,10 @@ subtest 'ORM::Logger - Multiple calls to log()' => sub {
     like($lines[2], qr/Message 3/, 'Third message correct');
 };
 
-subtest 'ORM::Logger - log() with SQL statement' => sub {
+subtest 'Durance::Logger - log() with SQL statement' => sub {
     local $ENV{ORM_SQL_LOGGING} = 1;
     
-    my $logger = ORM::Logger->new;
+    my $logger = Durance::Logger->new;
     
     my $stderr_output = '';
     open my $stderr_fh, '>', \$stderr_output or die "Cannot capture STDERR: $!";
@@ -150,11 +150,11 @@ subtest 'ORM::Logger - log() with SQL statement' => sub {
     like($stderr_output, qr/\[42\]/, 'Parameters logged');
 };
 
-subtest 'ORM::Logger - Subclassable for custom behavior' => sub {
+subtest 'Durance::Logger - Subclassable for custom behavior' => sub {
     # Create a custom logger subclass
     package TestCustomLogger;
     use Moo;
-    extends 'ORM::Logger';
+    extends 'Durance::Logger';
     
     has 'logged_messages' => (is => 'rw', default => sub { [] });
     

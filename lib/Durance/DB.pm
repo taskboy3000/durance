@@ -1,5 +1,5 @@
 # All code copyright Joe Johnston <jjohn@taskboy.com> 2026
-package ORM::DB;
+package Durance::DB;
 use strict;
 use warnings;
 use experimental 'signatures';

@@ -1,5 +1,5 @@
 # All code copyright Joe Johnston <jjohn@taskboy.com> 2026
-package ORM::Logger;
+package Durance::Logger;
 use strict;
 use warnings;
 use experimental 'signatures';
@@ -16,13 +16,13 @@ sub log ($self, $message) {
 
 =head1 NAME
 
-ORM::Logger - Simple SQL logging to STDERR
+Durance::Logger - Simple SQL logging to STDERR
 
 =head1 SYNOPSIS
 
-    use ORM::Logger;
+    use Durance::Logger;
     
-    my $logger = ORM::Logger->new;
+    my $logger = Durance::Logger->new;
     $logger->log("SELECT * FROM users WHERE id = ?");
     
     # Enable logging via environment variable:
@@ -30,7 +30,7 @@ ORM::Logger - Simple SQL logging to STDERR
 
 =head1 DESCRIPTION
 
-ORM::Logger provides simple, lightweight logging to STDERR for SQL statements
+Durance::Logger provides simple, lightweight logging to STDERR for SQL statements
 and diagnostic messages. Logging is controlled by the C<ORM_SQL_LOGGING>
 environment variable and is disabled by default.
 
@@ -72,7 +72,7 @@ You can override the C<log()> method to implement custom logging:
 
     package MyApp::CustomLogger;
     use Moo;
-    extends 'ORM::Logger';
+    extends 'Durance::Logger';
     
     sub log ($self, $message) {
         # Custom logging logic here
@@ -88,6 +88,6 @@ Then in your ORM classes, override C<_build_logger>:
 
 =head1 SEE ALSO
 
-L<ORM::Model>, L<ORM::ResultSet>, L<ORM::Schema>
+L<Durance::Model>, L<Durance::ResultSet>, L<Durance::Schema>
 
 =cut

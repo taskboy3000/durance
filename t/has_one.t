@@ -12,15 +12,15 @@ use File::Basename;
 use lib dirname($FindBin::Bin) . '/lib';
 
 # Import ORM modules
-require ORM::Model;
-require ORM::Schema;
-require ORM::DSL;
-require ORM::DB;
+require Durance::Model;
+require Durance::Schema;
+require Durance::DSL;
+require Durance::DB;
 
 # Test database setup - creates temp file each time
 package CountTestDB;
 use Moo;
-extends 'ORM::DB';
+extends 'Durance::DB';
 use File::Temp qw(tempfile);
 
 has 'temp_file' => (is => 'lazy');
@@ -38,7 +38,7 @@ sub _build_dsn ($self) {
 # Test model base class
 package CountTestModel;
 use Moo;
-extends 'ORM::Model';
+extends 'Durance::Model';
 
 sub _db_class_for { return 'CountTestDB'; }
 
@@ -48,12 +48,12 @@ package main;
 # Test Suite: has_one Relationships
 # ============================================================================
 
-subtest 'ORM::Model - has_one Relationships' => sub {
+subtest 'Durance::Model - has_one Relationships' => sub {
     # Define test models
     package MyApp::Model::User;
     use Moo;
     extends 'CountTestModel';
-    use ORM::DSL;
+    use Durance::DSL;
 
     tablename 'users';
     column id   => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -69,7 +69,7 @@ subtest 'ORM::Model - has_one Relationships' => sub {
     package MyApp::Model::Profile;
     use Moo;
     extends 'CountTestModel';
-    use ORM::DSL;
+    use Durance::DSL;
 
     tablename 'profiles';
     column id      => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -81,7 +81,7 @@ subtest 'ORM::Model - has_one Relationships' => sub {
     package MyApp::Model::Contact;
     use Moo;
     extends 'CountTestModel';
-    use ORM::DSL;
+    use Durance::DSL;
 
     tablename 'contacts';
     column id       => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -91,7 +91,7 @@ subtest 'ORM::Model - has_one Relationships' => sub {
     package MyApp::Model::Post;
     use Moo;
     extends 'CountTestModel';
-    use ORM::DSL;
+    use Durance::DSL;
 
     tablename 'posts';
     column id      => (is => 'rw', isa => 'Int', primary_key => 1);
@@ -104,7 +104,7 @@ subtest 'ORM::Model - has_one Relationships' => sub {
 
     # Create schema and tables
     my $dbh = MyApp::Model::User->db->dbh;
-    my $schema = ORM::Schema->new(dbh => $dbh);
+    my $schema = Durance::Schema->new(dbh => $dbh);
     
     $schema->create_table(MyApp::Model::User->new);
     $schema->create_table(MyApp::Model::Profile->new);
