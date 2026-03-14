@@ -77,7 +77,7 @@ and auto-timestamps.
 
 **Attributes:** `class` (ro, required), `conditions` (rw),
 `order_by` (rw), `limit_val` (rw), `offset_val` (rw),
-`join_specs` (rw)
+`join_specs` (rw), `preload_specs` (rw)
 
 **Methods:**
 - `where($conditions)` - Add WHERE conditions (chainable)
@@ -85,6 +85,7 @@ and auto-timestamps.
 - `limit($n)` - Set LIMIT (chainable)
 - `offset($n)` - Set OFFSET (chainable)
 - `add_joins(@relations)` - Add JOIN clauses (chainable)
+- `preload(@relations)` - Add eager loading (chainable)
 - `all` - Execute query, return results
 - `first` - Execute with LIMIT 1, return first result
 - `count` - Execute COUNT(*) query
@@ -388,7 +389,7 @@ developer experience and catch errors early.
 
 ---
 
-## Pending Tasks
+## Completed Tasks Detail
 
 ### 18. many_to_many() Relationship Support
 
@@ -534,13 +535,13 @@ and performance analysis. Built with Test-Driven Development approach.
 **Implementation (Test-Driven Development):**
 
 **Files Created:**
-- `lib/ORM/Logger.pm` - Stateless logger class with `log()` method
+- `lib/Durance/Logger.pm` - Stateless logger class with `log()` method
 - `t/logger.t` - Comprehensive test suite (9 test suites, all passing)
 
 **Files Modified:**
-- `lib/ORM/Model.pm` - Added logger attribute, wrapped find/all/insert/update/delete
-- `lib/ORM/ResultSet.pm` - Added logger attribute, wrapped all/count methods
-- `lib/ORM/Schema.pm` - Replaced custom logger with Durance::Logger, wrapped DDL operations
+- `lib/Durance/Model.pm` - Added logger attribute, wrapped find/all/insert/update/delete
+- `lib/Durance/ResultSet.pm` - Added logger attribute, wrapped all/count methods
+- `lib/Durance/Schema.pm` - Replaced custom logger with Durance::Logger, wrapped DDL operations
 
 **Sub-Tasks Completed:**
 - ✅ Step 1: Created comprehensive test suite in `t/logger.t`
@@ -606,7 +607,7 @@ method now respects JOIN specifications and applies DISTINCT when needed.
 - `t/count_with_join.t` - Comprehensive test suite (8 test cases, all passing)
 
 **Files Modified:**
-- `lib/ORM/ResultSet.pm` - Added JOIN and DISTINCT support to count() + refactored all()
+- `lib/Durance/ResultSet.pm` - Added JOIN and DISTINCT support to count() + refactored all()
 
 **Sub-Tasks Completed:**
 - ✅ Step 1: Created comprehensive test suite with 8 test scenarios
@@ -682,7 +683,7 @@ dry-run mode lacks a compelling real-world use case.
 
 Can be revisited if users request it in the future.
 
-### 10. Extract all_relations() for Code Reuse ✓ IN PROGRESS
+### 10. Extract all_relations() for Code Reuse ✓ COMPLETED
 
 Unified relationship-gathering logic into `Durance::Model->all_relations()` to
 avoid duplication and prepare for additional relationship types like
@@ -704,47 +705,65 @@ avoid duplication and prepare for additional relationship types like
 
 ### 11. Architectural Analysis & SRP Review ✓ COMPLETED
 
-Performed comprehensive analysis of all 5 ORM modules against framework
-requirements and Single Responsibility Principle.
+Analyzed all 6 ORM modules against framework requirements and Single Responsibility Principle.
+
+**Current Metrics (March 2026):**
+- 6 modules, 3212 total lines
+- 40 tests, 7 test files
+- 100% test pass rate
 
 **Key Findings:**
 
-| Module | Responsibilities | SRP Status |
-|--------|------------------|------------|
-| Durance::DB | 2 | ✓ Compliant |
-| Durance::DSL | 5 | ✗ Violation |
-| Durance::Model | 8 | ✗✗ God Object |
-| Durance::ResultSet | 3 | ✗ Violation |
-| Durance::Schema | 7 | ✗✗ Violation |
+| Module | Lines | Responsibilities | SRP Status |
+|--------|-------|------------------|------------|
+| Durance::DB | 216 | 2 | ✓ Compliant |
+| Durance::DSL | 496 | 5 | ✗ Violation |
+| Durance::Logger | 99 | 1 | ✓ Compliant |
+| Durance::Model | 715 | 8 | ✗✗ God Object |
+| Durance::ResultSet | 964 | 3 | ✗ Violation |
+| Durance::Schema | 722 | 7 | ✗✗ Violation |
 
-**Framework Requirements Met: 67% (6/9)**
-- ✅ Lightweight
+**Framework Requirements Met: 86% (6/7)**
+- ✅ Lightweight (Moo, not Moose)
 - ✅ Convention over Configuration
-- ✅ Relationships (has_many, belongs_to, JOINs)
+- ✅ Relationships (has_many, belongs_to, has_one, many_to_many)
 - ✅ Query building (ResultSet chainable methods)
 - ✅ CRUD operations
-- ✅ **Verbose SQL logging with timing** (COMPLETED - Task 13)
-- ⏸️ **Dry-run mode for migrations** (DEFERRED - No real-world use case)
+- ✅ Verbose SQL logging with timing
+- ⏸️ Dry-run mode for migrations (DEFERRED - No real-world use case)
 
 **SRP Violations Identified:**
 - Durance::Model (8 responsibilities) - CRITICAL God Object
 - Durance::Schema (7 responsibilities) - Mixed concerns
-- Durance::DSL (5 responsibilities) - Definition + SQL generation
-- Durance::ResultSet (3 responsibilities) - State + SQL gen + execution
+- Durance::DSL (5 responsibilities) - Definition + metadata
+- Durance::ResultSet (3 responsibilities) - State + SQL + execution
 
-**Deliverables Generated:**
+**Analysis Files Generated:**
 - `ANALYSIS_EXECUTIVE_SUMMARY.txt` - Leadership summary
 - `ORM_MODULES_MATRIX.txt` - Quick reference matrix
 - `ORM_ARCHITECTURE_SUMMARY.txt` - Detailed breakdown
 - `ORM_ARCHITECTURAL_ANALYSIS.md` - Technical deep dive
 - `ARCHITECTURAL_ANALYSIS_INDEX.md` - Navigation guide
 
-**Refactoring Roadmap Created:**
-- Phase 1: Add dry-run mode + SQL logging (56% → 78% compliance)
-- Phase 2: Extract query builder + split Durance::Model (improve SRP)
-- Phase 3: Refactor DSL + deduplicate code
+**Refactoring Roadmap:**
+- Phase 1: Extract DDL from Schema, query SQL from ResultSet
+- Phase 2: Split Durance::Model with roles/traits
+- Phase 3: Add MariaDB driver support
 
-Estimated effort: 50-60 hours over 6 weeks
+**How to Regenerate This Analysis:**
+
+```bash
+# Count lines in each module
+wc -l lib/Durance/*.pm
+
+# List public methods
+grep -n '^\s*sub\s\+' lib/Durance/*.pm
+
+# Count test files and tests  
+prove -l t/ 2>&1 | tail -1
+```
+
+**Estimated effort for full SRP compliance:** 50-60 hours over 6 weeks
 
 ### 12. Complete Test Coverage of Public API ✓ COMPLETED
 
@@ -794,200 +813,128 @@ modules.
 
 ## Future Features
 
-### Near Term
+### Task 15. Dry-Run Mode (DEFERRED)
 
-| Feature | Description | Priority | Status |
-|---------|-------------|----------|--------|
-| `has_one()` | One-to-one relationship support | Medium | ✓ COMPLETED |
-| `preload()` | Eager loading (2 queries, avoids N+1) | Medium | ✓ COMPLETED |
-| COUNT with JOIN | Special handling for COUNT queries with JOINs | Medium | ✓ COMPLETED |
-| `many_to_many()` | Junction table relationships | Medium | ✓ COMPLETED |
+**Status: DEFERRED** - No immediate use case identified.
 
-### 17. preload() - ✓ COMPLETED
+Given that `Durance::Schema::pending_changes()` already shows what schema changes
+would happen, and users can review changes via this method before applying them,
+dry-run mode lacks a compelling real-world use case.
 
-Implement eager loading to avoid N+1 query problems. This is an **optional** feature 
-that users explicitly enable when they want to pre-load related records efficiently.
+Can be revisited if users request it in the future.
 
-**Problem:**
-- N+1 query problem: Loading 100 users with their posts requires 101 queries (1 + 100)
-- Current solutions: `add_joins()` uses SQL JOIN which duplicates rows for has_many
-- Need alternative: preload() uses 2 queries to batch-load related records
+---
 
-**Understanding preload() vs add_joins():**
+### Task 24. MariaDB Support
 
-| Aspect | add_joins() | preload() |
-|--------|--------------|-----------|
-| Queries | 1 query with JOIN | 2 queries (main + related) |
-| Row duplication | Yes (duplicates main records) | No (separate result sets) |
-| Best for | Filtering by related data | Loading related data |
-| Use case | "Find users with active posts" | "Show all users with their posts" |
+Add database driver support and tests for MariaDB.
 
-**Requirements:**
-- ✅ Add `preload()` method to ResultSet (chainable like where())
-- ✅ Preload has_many relationships (batch load all related records)
-- ✅ Preload belongs_to relationships (single query)
-- ✅ Preload has_one relationships (single query)
-- ✅ Store preloaded data in model instances
-- ✅ Subsequent relationship accessors use cached data (no extra queries)
-- ✅ Support multiple preloads: `->preload('posts', 'comments')`
-- ✅ SQL logging support (via Durance::Logger)
-- ✅ Chain with other methods: `->where(...)->preload(...)->all()`
-- ✅ No breaking changes to existing API
+- [ ] Add MariaDB driver detection
+- [ ] Add MariaDB DDL type mapping (if different from MySQL)
+- [ ] Add integration tests with MariaDB
 
-**Test-Driven Development Implementation Plan:**
+---
 
-**Step 1: Create comprehensive test suite** (`t/preload.t`)
-- Test preload has_many relationship
-- Test preload belongs_to relationship
-- Test preload has_one relationship
-- Test multiple preloads in one call
-- Test preload with where() conditions
-- Test preload with order() and limit()
-- Test preload returns correct data (not duplicated)
-- Test preload with empty results
-- Test preload caches data (no extra queries)
-- Test preload SQL logging shows 2 queries
+### Task 25. include() Method
 
-**Step 2: Add preload() method to ResultSet**
-- Add `preload_specs` attribute to ResultSet (array ref)
-- Add `preload()` chainable method
-- Validate relationship names against model's all_relations()
-- Store preload specifications for later execution
+Implement JOIN + record inflation for nested objects.
 
-**Step 3: Implement eager loading logic in all()**
-- After main query executes, check if preload_specs exist
-- For each preload specification:
-  - Extract related records in batch query
-  - Map related records to parent record IDs
-  - Store in model instances for later access
-- Use lazy loading pattern: store in model instance hash
+- [ ] Design include() API
+- [ ] Implement include() in ResultSet
+- [ ] Write tests for include()
 
-**Step 4: Implement cached relationship access**
-- Modify has_many accessor to check for preloaded data first
-- Modify belongs_to accessor to check for preloaded data first
-- Modify has_one accessor to check for preloaded data first
-- Return cached data if available, otherwise query normally
+---
 
-**Step 5: Update ResultSet first() method**
-- Ensure preloading works with first() too
+### Task 26. Performance Testing
 
-**Step 6: SQL logging for preloads**
-- Log each preload query separately
-- Show total queries executed
+Benchmark SQL queries and model operations.
 
-**Step 7: Integration testing**
-- Run full test suite (t/orm.t + t/preload.t)
-- Verify no regressions
+- [ ] Create benchmark suite
+- [ ] Profile key operations
+- [ ] Document performance characteristics
 
-**Example Usage After Implementation:**
-```perl
-# Model definitions
-package MyApp::Model::User;
-use Moo;
-extends 'Durance::Model';
-use Durance::DSL;
+---
 
-tablename 'users';
-column id   => (is => 'rw', isa => 'Int', primary_key => 1);
-column name => (is => 'rw', isa => 'Str');
+### Task 23. Refactor Durance::Model (Extract Query Builder)
 
-has_many posts => (is => 'rw', isa => 'MyApp::Model::Post');
-has_one profile => (is => 'rw', isa => 'MyApp::Model::Profile');
-belongs_to company => (is => 'rw', isa => 'MyApp::Model::Company');
+Extract query building logic from Durance::Model into a separate Durance::QueryBuilder class
+to reduce the God Object (8 responsibilities).
 
-package MyApp::Model::Post;
-use Moo;
-extends 'Durance::Model';
-use Durance::DSL;
+**Objective:** Split Durance::Model's responsibilities into focused, single-purpose classes.
 
-tablename 'posts';
-column id      => (is => 'rw', isa => 'Int', primary_key => 1);
-column user_id => (is => 'rw', isa => 'Int');
-column title   => (is => 'rw', isa => 'Str');
+**Current Problem:**
+- Durance::Model has 8 responsibilities (God Object)
+- Query generation mixed with relationship accessors
+- Validations and timestamps tightly coupled
+- Hard to test and maintain
 
-belongs_to user => (is => 'rw', isa => 'MyApp::Model::User');
+**Implementation Steps:**
 
-1;
+- [ ] **Step 1: Analyze Durance::Model responsibilities**
+  - [ ] Document all methods in Durance::Model
+  - [ ] Categorize into responsibility groups
+  - [ ] Identify what's truly "query building" vs "model logic"
 
-# Usage - preload has_many
-my @users = User->preload('posts')->all;
-# SQL 1: SELECT * FROM users
-# SQL 2: SELECT * FROM posts WHERE user_id IN (1, 2, 3, ...)
+- [ ] **Step 2: Create Durance::QueryBuilder module**
+  - [ ] Create `lib/Durance/QueryBuilder.pm`
+  - [ ] Define core query building methods:
+    - `where($conditions)` - Build WHERE clause
+    - `order($clause)` - Build ORDER BY
+    - `limit($n)` - Build LIMIT
+    - `offset($n)` - Build OFFSET
+    - `add_joins(@relations)` - Build JOINs
+  - [ ] Add SQL generation methods:
+    - `build_select()` - Generate SELECT SQL
+    - `build_where()` - Generate WHERE clause
+    - `build_joins()` - Generate JOIN clauses
+  - [ ] Add driver-aware SQL generation (for MariaDB/MySQL compatibility)
 
-for my $user (@users) {
-    my @posts = $user->posts;  # Uses preloaded data - no extra query!
-}
+- [ ] **Step 3: Extract relationship query logic**
+  - [ ] Move has_many query generation to QueryBuilder
+  - [ ] Move belongs_to query generation to QueryBuilder
+  - [ ] Move has_one query generation to QueryBuilder
+  - [ ] Move many_to_many query generation to QueryBuilder
 
-# Usage - preload multiple relationships
-my @users = User->preload('posts', 'profile')->all;
-# SQL 1: SELECT * FROM users
-# SQL 2: SELECT * FROM posts WHERE user_id IN (...)
-# SQL 3: SELECT * FROM profiles WHERE user_id IN (...)
+- [ ] **Step 4: Update Durance::Model to use QueryBuilder**
+  - [ ] Update has_many accessor to delegate to QueryBuilder
+  - [ ] Update belongs_to accessor to delegate to QueryBuilder
+  - [ ] Update has_one accessor to delegate to QueryBuilder
+  - [ ] Update many_to_many accessor to delegate to QueryBuilder
 
-# Usage - preload with where conditions
-my @users = User->where({ active => 1 })
-                ->preload('posts')
-                ->order('name')
-                ->all;
-# SQL 1: SELECT * FROM users WHERE active = 1 ORDER BY name
-# SQL 2: SELECT * FROM posts WHERE user_id IN (...) AND ...
+- [ ] **Step 5: Create tests for QueryBuilder**
+  - [ ] Test basic query building (where, order, limit)
+  - [ ] Test JOIN query building
+  - [ ] Test relationship query building
+  - [ ] Test SQL generation methods
 
-# Usage - preload belongs_to
-my @posts = Post->preload('user')->all;
-# SQL 1: SELECT * FROM posts
-# SQL 2: SELECT * FROM users WHERE id IN (...)
+- [ ] **Step 6: Run integration tests**
+  - [ ] All existing tests pass
+  - [ ] No regressions in functionality
+  - [ ] Performance not degraded
 
-for my $post (@posts) {
-    my $user = $post->user;  # Uses preloaded data!
-}
+**Target Architecture:**
 
-# Comparison: Without preload (N+1 problem)
-my @users = User->all;
-for my $user (@users) {
-    my @posts = $user->posts;  # Each call = 1 query!
-}
-# 1 + N queries (slow!)
+```
+Durance::Model (base class)
+    |
+    +-- Durance::QueryBuilder (query building)
+    |     - where(), order(), limit(), offset()
+    |     - build_select(), build_where(), build_joins()
+    |
+    +-- Durance::ResultSet (result set management)
+    |
+    +-- Durance::Model::Role::Relationships (has_many, belongs_to, etc.)
+    |
+    +-- Durance::Model::Role::Validations (validates)
 ```
 
-**Design Notes:**
-- Preload stores data in model instances using a private hash key
-- Relationship accessors check cache first before querying
-- Cache is instance-specific (per model object)
-- Preload queries use WHERE ... IN (...) for efficiency
-- Empty preloads handled gracefully (no queries if no parent records)
+**Benefits:**
+- Single Responsibility: Each class has one job
+- Testability: QueryBuilder can be tested in isolation
+- Reusability: QueryBuilder can be used independently
+- Maintainability: Changes to query logic don't affect model logic
 
-**Key Differences from add_joins():**
-
-| Feature | add_joins() | preload() |
-|---------|--------------|-----------|
-| Query count | 1 | 2+ |
-| Row duplication | Yes | No |
-| Filtering | Can filter by related data | Cannot filter |
-| Data access | Flat in results | Nested in objects |
-| Memory | Lower (shared rows) | Higher (separate objects) |
-
-**Implementation Summary:**
-
-- ✅ All 10 test cases passing in `t/preload.t`
-- ✅ Works with has_many, belongs_to, and has_one relationships
-- ✅ Batch loading via WHERE ... IN (...) for efficiency
-- ✅ Cached in model instances for subsequent access
-- ✅ Chainable with where(), order(), limit()
-- ✅ SQL logging shows preload queries
-
-**Test Results:**
-- Total tests: 40 passing (7 test files)
-
-**Effort Estimate:** 4-5 hours
-
-### Long Term
-
-| Feature | Description | Priority | Status |
-|---------|-------------|----------|--------|
-| MariaDB support | Add database driver support and tests for MariaDB | Low | Pending |
-| `include()` | JOIN + record inflation for nested objects | Low | Pending |
-| Column aliasing | Handle column name collisions in JOINs | Low | ✓ COMPLETED |
-| Performance testing | Benchmark SQL queries and model operations | Low | Pending |
+**Estimated effort:** 8-12 hours
 
 ---
 
@@ -1066,15 +1013,7 @@ This is by design since:
 
 ---
 
-### Deferred Features
-
-| Feature | Description | Priority | Reason |
-|---------|-------------|----------|--------|
-| Dry-run mode | Report SQL without executing | Medium | No real-world use case; pending_changes() covers schema review |
-
----
-
-## Project Rename: ORM → Durance
+## Project Rename: ORM → Durance ✓ COMPLETED
 
 ### Task: Rename project namespace from ORM to Durance
 
@@ -1089,37 +1028,37 @@ This is by design since:
 **Implementation Plan:**
 
 **Step 1: Rename lib/ORM/ directory to lib/Durance/**
-- [ ] `mv lib/ORM lib/Durance`
+- [x] `mv lib/ORM lib/Durance`
 
 **Step 2: Update package declarations in all modules**
-- [ ] `lib/Durance/DB.pm` - `package Durance::DB;`
-- [ ] `lib/Durance/Model.pm` - `package Durance::Model;`
-- [ ] `lib/Durance/ResultSet.pm` - `package Durance::ResultSet;`
-- [ ] `lib/Durance/DSL.pm` - `package Durance::DSL;`
-- [ ] `lib/Durance/Schema.pm` - `package Durance::Schema;`
-- [ ] `lib/Durance/Logger.pm` - `package Durance::Logger;`
+- [x] `lib/Durance/DB.pm` - `package Durance::DB;`
+- [x] `lib/Durance/Model.pm` - `package Durance::Model;`
+- [x] `lib/Durance/ResultSet.pm` - `package Durance::ResultSet;`
+- [x] `lib/Durance/DSL.pm` - `package Durance::DSL;`
+- [x] `lib/Durance/Schema.pm` - `package Durance::Schema;`
+- [x] `lib/Durance/Logger.pm` - `package Durance::Logger;`
 
 **Step 3: Update internal references in module files**
-- [ ] All `Durance::` references → `Durance::` within module code
-- [ ] Update `our` package variables: `%_has_many`, `%_belongs_to`, etc.
+- [x] All `ORM::` references → `Durance::` within module code
+- [x] Update `our` package variables: `%_has_many`, `%_belongs_to`, etc.
 
 **Step 4: Update test files**
-- [ ] `t/orm.t` - Update all require/use statements and package references
-- [ ] `t/logger.t` - Update all require/use statements
-- [ ] `t/count_with_join.t` - Update all require/use statements
-- [ ] `t/has_one.t` - Update all require/use statements
-- [ ] `t/preload.t` - Update all require/use statements
+- [x] `t/orm.t` - Update all require/use statements and package references
+- [x] `t/logger.t` - Update all require/use statements
+- [x] `t/count_with_join.t` - Update all require/use statements
+- [x] `t/has_one.t` - Update all require/use statements
+- [x] `t/preload.t` - Update all require/use statements
 
 **Step 5: Update documentation**
-- [ ] `AGENTS.md` - Update references and directory structure
-- [ ] `PROJECT_PLAN.md` - Update all Durance:: references to Durance::
+- [x] `AGENTS.md` - Update references and directory structure
+- [x] `PROJECT_PLAN.md` - Update all ORM:: references to Durance::
 
 **Step 6: Update example models (if any)**
-- [ ] `t/MyApp/Model/*` - Update extends from 'Durance::Model' to 'Durance::Model'
+- [x] `t/MyApp/Model/*` - Update extends from 'ORM::Model' to 'Durance::Model'
 
 **Step 7: Run tests and verify**
-- [ ] `prove -l t/*.t` - All tests pass
-- [ ] Fix any namespace issues discovered during testing
+- [x] `prove -l t/*.t` - All tests pass
+- [x] Fix any namespace issues discovered during testing
 
 **Example Changes:**
 
