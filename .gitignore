@@ -5,6 +5,7 @@ t/MyApp/var/test.db
 
 # Perl build products
 Makefile
+Makefile.old
 pm_to_blib
 META.json
 META.yml
@@ -13,6 +14,8 @@ MYMETA.yml
 _build/
 Build
 blib/
+Durance-*
+perl
 
 # Editor backups
 *.bak

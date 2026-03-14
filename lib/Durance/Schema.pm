@@ -476,10 +476,33 @@ sub pending_changes ( $self, $modelOrClass ) {
     return \@pending;
 }
 
+our $VERSION = '0.01';
 
 1;
 
-__END__
+=pod
+
+=head1 NAME
+
+Durance::Schema - Schema introspection and migration
+
+=head1 VERSION
+
+Version 0.01
+
+=head1 DESCRIPTION
+
+Provides schema introspection, DDL generation, and migration for Durance ORM.
+
+=head1 AUTHOR
+
+Joe Johnston <jjohn@taskboy.com>
+
+=head1 LICENSE
+
+Perl Artistic License
+
+=cut
 
 =head1 NAME
 

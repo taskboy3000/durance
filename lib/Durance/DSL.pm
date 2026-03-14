@@ -282,6 +282,8 @@ sub load_into {
     };
 }
 
+our $VERSION = '0.01';
+
 1;
 
 =pod
@@ -313,5 +315,25 @@ sub load_into {
 =head1 SEE ALSO
 
 L<Durance::Model>
+
+=head1 NAME
+
+Durance::DSL - Domain-specific language for defining models
+
+=head1 VERSION
+
+Version 0.01
+
+=head1 DESCRIPTION
+
+Provides DSL functions for defining model columns, relationships, and validations.
+
+=head1 AUTHOR
+
+Joe Johnston <jjohn@taskboy.com>
+
+=head1 LICENSE
+
+Perl Artistic License
 
 =cut

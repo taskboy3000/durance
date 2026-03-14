@@ -412,9 +412,33 @@ sub _load_resultset {
     return 'Durance::ResultSet';
 }
 
+our $VERSION = '0.01';
+
 1;
 
-__END__
+=pod
+
+=head1 NAME
+
+Durance::Model - ActiveRecord-style ORM base class
+
+=head1 VERSION
+
+Version 0.01
+
+=head1 DESCRIPTION
+
+Provides CRUD operations, relationships, and query interface for Durance ORM.
+
+=head1 AUTHOR
+
+Joe Johnston <jjohn@taskboy.com>
+
+=head1 LICENSE
+
+Perl Artistic License
+
+=cut
 
 =encoding UTF-8
 

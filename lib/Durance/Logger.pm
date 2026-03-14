@@ -10,6 +10,8 @@ sub log ($self, $message) {
     warn "[" . scalar(localtime) . "][$$] $message\n";
 }
 
+our $VERSION = '0.01';
+
 1;
 
 =pod
@@ -17,6 +19,10 @@ sub log ($self, $message) {
 =head1 NAME
 
 Durance::Logger - Simple SQL logging to STDERR
+
+=head1 VERSION
+
+Version 0.01
 
 =head1 SYNOPSIS
 

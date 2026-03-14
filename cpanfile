@@ -1,8 +1,8 @@
-# cpanfile - Perl dependencies for your Mojolicious web app
-requires 'App::cpanminus';
+# cpanfile - Perl dependencies for Durance ORM
 requires 'Moo';
 requires 'DBI';
 requires 'DBD::SQLite';
-requires 'Test2::Suite';
-requires 'Modern::Perl';
-requires 'Perl::Tidy';
+
+on 'test' => sub {
+    requires 'Test2::Suite';
+};

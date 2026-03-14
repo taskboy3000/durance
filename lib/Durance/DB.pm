@@ -76,7 +76,33 @@ sub isDSNValid ($self, $dsn = undef) {
     return wantarray ? (0, $error) : 0;
 }
 
+our $VERSION = '0.01';
+
 1;
+
+=pod
+
+=head1 NAME
+
+Durance::DB - Database connection management
+
+=head1 VERSION
+
+Version 0.01
+
+=head1 DESCRIPTION
+
+Provides database connection management with handle pooling for Durance ORM.
+
+=head1 AUTHOR
+
+Joe Johnston <jjohn@taskboy.com>
+
+=head1 LICENSE
+
+Perl Artistic License
+
+=cut
 
 __END__
 

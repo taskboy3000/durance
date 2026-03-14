@@ -474,9 +474,33 @@ sub count ($self) {
     return $count;
 }
 
+our $VERSION = '0.01';
+
 1;
 
-__END__
+=pod
+
+=head1 NAME
+
+Durance::ResultSet - Chainable query builder
+
+=head1 VERSION
+
+Version 0.01
+
+=head1 DESCRIPTION
+
+Provides chainable query building with where, order, limit, offset, joins, and preload.
+
+=head1 AUTHOR
+
+Joe Johnston <jjohn@taskboy.com>
+
+=head1 LICENSE
+
+Perl Artistic License
+
+=cut
 
 =head1 NAME
 
