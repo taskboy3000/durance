@@ -1,4 +1,4 @@
-# All code copyright Joe Johnston <jjohn@taskboy.com> 2026
+# All code Joe Johnston <jjohn@taskboy.com> 2026
 package Durance::Logger;
 use strict;
 use warnings;

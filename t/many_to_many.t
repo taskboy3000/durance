@@ -114,6 +114,58 @@ subtest 'many_to_many - all_relations includes many_to_many' => sub {
     is($all->{books}, 'many_to_many', 'books is many_to_many type');
 };
 
+subtest 'many_to_many - preload' => sub {
+    my @authors = MyApp::Model::Author->preload('books')->all;
+    is(scalar(@authors), 2, 'preload returns 2 authors');
+    
+    my $alice = (grep { $_->name eq 'Alice' } @authors)[0];
+    my $bob = (grep { $_->name eq 'Bob' } @authors)[0];
+    
+    my @alice_books = $alice->books;
+    is(scalar(@alice_books), 2, 'Alice has 2 books (from cache)');
+    
+    my @bob_books = $bob->books;
+    is(scalar(@bob_books), 0, 'Bob has no books (from cache)');
+};
+
+subtest 'many_to_many - preload reverse direction' => sub {
+    my @books = MyApp::Model::Book->preload('authors')->all;
+    is(scalar(@books), 2, 'preload returns 2 books');
+    
+    my $book1 = $books[0];
+    my @book1_authors = $book1->authors;
+    is(scalar(@book1_authors), 1, 'Book 1 has 1 author (from cache)');
+};
+
+subtest 'many_to_many - create_related' => sub {
+    my $charlie = MyApp::Model::Author->create({ name => 'Charlie' });
+    ok($charlie->id, 'Charlie created');
+    
+    my $new_book = $charlie->create_books({ title => 'Charlie Book' });
+    ok($new_book->id, 'book created with id');
+    is($new_book->title, 'Charlie Book', 'book title correct');
+    
+    my @charlie_books = $charlie->books;
+    is(scalar(@charlie_books), 1, 'Charlie now has 1 book');
+    is($charlie_books[0]->title, 'Charlie Book', 'book title matches');
+    
+    my @authors = $new_book->authors;
+    is(scalar(@authors), 1, 'Book has 1 author');
+    is($authors[0]->name, 'Charlie', 'author is Charlie');
+};
+
+subtest 'many_to_many - create_related clears cache' => sub {
+    my $dave = MyApp::Model::Author->create({ name => 'Dave' });
+    
+    my @books1 = $dave->books;
+    is(scalar(@books1), 0, 'Dave has no books initially');
+    
+    $dave->create_books({ title => 'Dave Book 1' });
+    
+    my @books2 = $dave->books;
+    is(scalar(@books2), 1, 'Dave has 1 book after create');
+};
+
 $db->disconnect_all;
 
 unlink $db_path if -e $db_path;

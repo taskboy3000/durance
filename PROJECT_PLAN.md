@@ -464,34 +464,38 @@ my @authors = $book->authors; # SELECT * FROM authors ...
   - [x] Handle both directions (Author->books, Book->authors)
   - [x] Use EXISTS or JOIN query to fetch related records
 
-- [ ] **Step 4: Add preload support**
-  - [ ] Support preloading many_to_many relationships
-  - [ ] Use IN clause with collected IDs
+- [x] **Step 4: Add preload support**
+  - [x] Support preloading many_to_many relationships
+  - [x] Use JOIN query through junction table to collect parent IDs, then IN clause
+  - [x] Handle both directions (Author->books, Book->authors)
 
-- [ ] **Step 5: Add create_related support**
-  - [ ] Allow creating new related records via junction table
-  - [ ] `create_book($author, { title => 'New Book' })` creates book and junction
+- [x] **Step 5: Add create_related support**
+  - [x] Allow creating new related records via junction table
+  - [x] `create_book($author, { title => 'New Book' })` creates book and junction
 
 - [x] **Step 6: Write tests**
   - [x] Create test models (Author, Book, AuthorBook)
   - [x] Test basic many_to_many access
   - [x] Test bidirectional access
-  - [ ] Test with where conditions
-  - [ ] Test preload support
+  - [x] Test with where conditions
+  - [x] Test preload support
 
-- [ ] **Step 7: Update documentation**
+- [x] **Step 7: Update documentation**
   - [x] Add many_to_many to DSL documentation
   - [x] Update README with example
 
 ---
 
-### 19. Preload Support for many_to_many
+### 19. Preload Support for many_to_many ✓ COMPLETED
 
 Add eager loading support for many_to_many relationships.
 
-- [ ] Add preload handling in ResultSet for many_to_many relationships
-- [ ] Use JOIN query with DISTINCT to collect parent IDs, then IN clause
-- [ ] Write tests for many_to_many preload
+- [x] Add preload handling in ResultSet for many_to_many relationships
+- [x] Use JOIN query with DISTINCT to collect parent IDs, then IN clause
+- [x] Write tests for many_to_many preload
+- [x] many_to_many preload requires a JOIN through the junction table:
+  - For Author->books: SELECT books.* FROM books JOIN author_books ON books.id = author_books.book_id WHERE author_books.author_id IN (...)
+  - Uses `through` (junction table) and `using` (foreign key to related) from metadata
 
 ---
 

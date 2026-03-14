@@ -1,4 +1,4 @@
-# All code copyright Joe Johnston <jjohn@taskboy.com> 2026
+# All code Joe Johnston <jjohn@taskboy.com> 2026
 package Durance::ResultSet;
 use strict;
 use warnings;
@@ -101,7 +101,7 @@ sub preload ($self, @relations) {
                 $msg .= "$class_name has no defined"
                        . " relationships.\n"
                        . "Define relationships with"
-                       . " has_many, belongs_to, or has_one"
+                       . " has_many, belongs_to, has_one, or many_to_many"
                        . " in your model.\n";
             }
 
@@ -293,6 +293,40 @@ sub _eager_load ($self, $rows) {
                 my $fk_val = $parent->$fk;
                 $related_by_parent{$fk_val} = $rel_objs{$fk_val} if defined $fk_val;
             }
+        }
+        elsif ($rel_type eq 'many_to_many') {
+            # many_to_many: requires JOIN through junction table
+            # SELECT related.* FROM related 
+            # JOIN through ON related.id = through.using
+            # WHERE through.local_fk IN (parent_ids)
+            my $through = $meta->{through};
+            my $using = $meta->{using};
+            my $local_fk = $meta->{local_fk};
+            my $rel_table = $rel_class->table;
+
+            my $sql = "SELECT $rel_table.*, $through.$local_fk AS _parent_fk "
+                    . "FROM $rel_table "
+                    . "JOIN $through ON $rel_table.id = $through.$using "
+                    . "WHERE $through.$local_fk IN ("
+                    . join(',', ('?') x @parent_ids) . ")";
+
+            my $start = time();
+            my $sth = $class->db->dbh->prepare($sql);
+            $sth->execute(@parent_ids);
+            my $duration = (time() - $start) * 1000;
+
+            if ($ENV{ORM_SQL_LOGGING}) {
+                my $logger = Durance::Logger->new;
+                my $params_str = @parent_ids ? '[' . join(', ', @parent_ids) . ']' : '';
+                $logger->log("SQL (" . sprintf("%.3f", $duration) . " ms): PRELOAD $rel_name $sql $params_str");
+            }
+
+            while (my $row = $sth->fetchrow_hashref) {
+                my $parent_id = delete $row->{_parent_fk};
+                my $rel_obj = $rel_class->new(%$row, db => $class->db);
+                push @{$related_by_parent{$parent_id}}, $rel_obj;
+            }
+            $sth->finish;
         }
 
         # Store preloaded data in each parent object

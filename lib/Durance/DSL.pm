@@ -1,4 +1,4 @@
-# All code copyright Joe Johnston <jjohn@taskboy.com> 2026
+# All code Joe Johnston <jjohn@taskboy.com> 2026
 package Durance::DSL;
 use strict;
 use warnings;
@@ -167,7 +167,11 @@ sub load_into {
             # Check for preloaded data first
             my $key = "_preloaded_$name";
             if (exists $self->{$key}) {
-                return $self->{$key};
+                my $cached = $self->{$key};
+                # Handle undef or empty cache
+                return () unless defined $cached;
+                # In list context, dereference array; in scalar, return array ref
+                return wantarray ? @$cached : $cached;
             }
             
             my $model_class = $isa;
@@ -279,7 +283,11 @@ sub load_into {
             # Check for preloaded data first
             my $key = "_preloaded_$name";
             if (exists $self->{$key}) {
-                return $self->{$key};
+                my $cached = $self->{$key};
+                # Handle undef or empty cache
+                return () unless defined $cached;
+                # In list context, dereference array; in scalar, return array ref
+                return wantarray ? @$cached : $cached;
             }
             
             my $model_class = $isa;
@@ -311,6 +319,37 @@ sub load_into {
             $sth->finish;
             
             return wantarray ? @results : \@results;
+        };
+        
+        # Create related object and link via junction table
+        my $create_method = "create_$name";
+        *{"${pkg}::$create_method"} = sub ($self, @args) {
+            my $model_class = $isa;
+            my $pk = $self->primary_key;
+            my $pk_val = $self->$pk;
+            
+            die "Cannot create related object without primary key" unless defined $pk_val;
+            
+            my %data = @args == 1 && ref $args[0] eq 'HASH' ? %{$args[0]} : @args;
+            
+            # Create the related object
+            my $related = $model_class->create(\%data);
+            
+            # Insert into junction table
+            my $db = $self->db;
+            my $dbh = $db->dbh;
+            
+            $dbh->do(
+                "INSERT INTO $through ($local_foreign_key, $using) VALUES (?, ?)",
+                {},
+                $pk_val,
+                $related->id
+            );
+            
+            # Clear any cached data
+            delete $self->{"_preloaded_$name"};
+            
+            return $related;
         };
         
         return;

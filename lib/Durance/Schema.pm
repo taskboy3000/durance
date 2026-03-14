@@ -1,4 +1,4 @@
-# All code copyright Joe Johnston <jjohn@taskboy.com> 2026
+# All code Joe Johnston <jjohn@taskboy.com> 2026
 package Durance::Schema;
 use strict;
 use warnings;
