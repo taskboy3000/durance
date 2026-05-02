@@ -2,8 +2,8 @@
 package Durance::ResultSet;
 use strict;
 use warnings;
-use experimental 'signatures';
 use Moo;
+use experimental 'signatures';
 use Time::HiRes qw(time);
 
 has 'class' => (is => 'ro', required => 1);

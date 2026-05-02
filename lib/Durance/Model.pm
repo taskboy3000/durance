@@ -2,10 +2,8 @@
 package Durance::Model;
 use strict;
 use warnings;
-use experimental 'signatures';
-
-
 use Moo;
+use experimental 'signatures';
 use Time::HiRes qw(time);
 
 our %COLUMN_META;

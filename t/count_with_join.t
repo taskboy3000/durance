@@ -18,7 +18,9 @@ require Durance::DB;
 # Test database setup - creates temp file each time
 package CountTestDB;
 use Moo;
+use experimental 'signatures';
 extends 'Durance::DB';
+use experimental 'signatures';
 use File::Temp qw(tempfile);
 
 has 'temp_file' => (is => 'lazy');
@@ -36,7 +38,9 @@ sub _build_dsn ($self) {
 # Test model base class
 package CountTestModel;
 use Moo;
+use experimental 'signatures';
 extends 'Durance::Model';
+use experimental 'signatures';
 
 sub _db_class_for { return 'CountTestDB'; }
 

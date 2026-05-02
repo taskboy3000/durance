@@ -20,6 +20,7 @@ require Durance::DB;
 # Test database setup - creates temp file each time
 package TestDB;
 use Moo;
+use experimental 'signatures';
 extends 'Durance::DB';
 use File::Temp qw(tempfile);
 
@@ -38,6 +39,7 @@ sub _build_dsn ($self) {
 # Test model base class
 package TestModel;
 use Moo;
+use experimental 'signatures';
 extends 'Durance::Model';
 
 sub _db_class_for { return 'TestDB'; }
@@ -45,6 +47,7 @@ sub _db_class_for { return 'TestDB'; }
 # Define test models BEFORE using them
 package MyApp::Model::Author;
 use Moo;
+use experimental 'signatures';
 extends 'TestModel';
 use Durance::DSL;
 
@@ -57,6 +60,7 @@ has_one profile => (is => 'rw', isa => 'MyApp::Model::AuthorProfile');
 
 package MyApp::Model::Book;
 use Moo;
+use experimental 'signatures';
 extends 'TestModel';
 use Durance::DSL;
 
@@ -69,6 +73,7 @@ belongs_to author => (is => 'rw', isa => 'MyApp::Model::Author', foreign_key => 
 
 package MyApp::Model::AuthorProfile;
 use Moo;
+use experimental 'signatures';
 extends 'TestModel';
 use Durance::DSL;
 
@@ -81,6 +86,7 @@ belongs_to author => (is => 'rw', isa => 'MyApp::Model::Author', foreign_key => 
 
 package MyApp::Model::Publisher;
 use Moo;
+use experimental 'signatures';
 extends 'TestModel';
 use Durance::DSL;
 

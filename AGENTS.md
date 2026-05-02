@@ -95,7 +95,8 @@ perl -Ilib -wc lib/ORM/Model.pm
 ### General Principles
 - When writing perl scripts (not .pm perl modules), use this shebang line `#!/usr/bin/env perl`
 - Always use `use strict;` and `use warnings;` at the top of every file
-- Always use `use experimental ('signatures');` at the top of every Perl module and Perl test file
+- For Perl modules using Moo: use `use experimental ('signatures');` AFTER `use Moo;` to avoid experimental warnings
+- For test files and non-Moo modules: use `use experimental ('signatures');` after `use strict;` and `use warnings;`
 - Use Moo for OO perl  modules: `use Moo;`
 - Subclasses of this framework should only need `use Moo; extends 'Durance::Model';` or `use Moo; extends 'Durance::DB';`
 - If a module needs a helper function or method that does not need to be exposed to the user, those functions will start with an underscore like `_parse_dsn`.

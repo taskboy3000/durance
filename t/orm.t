@@ -20,6 +20,7 @@ use Durance::Schema;
 # Test database class - defined once for all tests
 package TestDB;
 use Moo;
+use experimental 'signatures';
 extends 'Durance::DB';
 use FindBin;
 
@@ -31,6 +32,7 @@ sub _build_dsn {
 # Base model class for test models that use TestDB
 package TestModel;
 use Moo;
+use experimental 'signatures';
 extends 'Durance::Model';
 
 sub _db_class_for { return 'TestDB'; }

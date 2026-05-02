@@ -2,12 +2,11 @@
 package Durance::DB;
 use strict;
 use warnings;
-use experimental 'signatures';
 use utf8;
-
 
 use DBI;
 use Moo;
+use experimental 'signatures';
 
 our %HANDLES;
 

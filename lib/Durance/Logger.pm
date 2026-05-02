@@ -2,8 +2,8 @@
 package Durance::Logger;
 use strict;
 use warnings;
-use experimental 'signatures';
 use Moo;
+use experimental 'signatures';
 
 sub log ($self, $message) {
     return unless $ENV{ORM_SQL_LOGGING};

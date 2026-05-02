@@ -16,6 +16,7 @@ require Durance::DB;
 
 package TestDB;
 use Moo;
+use experimental 'signatures';
 extends 'Durance::DB';
 use File::Temp qw(tempfile);
 
@@ -33,12 +34,14 @@ sub _build_dsn ($self) {
 
 package TestModel;
 use Moo;
+use experimental 'signatures';
 extends 'Durance::Model';
 
 sub _db_class_for { return 'TestDB'; }
 
 package MyApp::Model::Author;
 use Moo;
+use experimental 'signatures';
 extends 'TestModel';
 use Durance::DSL;
 
@@ -51,6 +54,7 @@ has_one profile => (is => 'rw', isa => 'MyApp::Model::AuthorProfile');
 
 package MyApp::Model::Book;
 use Moo;
+use experimental 'signatures';
 extends 'TestModel';
 use Durance::DSL;
 
@@ -63,6 +67,7 @@ belongs_to author => (is => 'rw', isa => 'MyApp::Model::Author', foreign_key => 
 
 package MyApp::Model::AuthorProfile;
 use Moo;
+use experimental 'signatures';
 extends 'TestModel';
 use Durance::DSL;
 

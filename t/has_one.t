@@ -20,6 +20,7 @@ require Durance::DB;
 # Test database setup - creates temp file each time
 package CountTestDB;
 use Moo;
+use experimental 'signatures';
 extends 'Durance::DB';
 use File::Temp qw(tempfile);
 
@@ -38,6 +39,7 @@ sub _build_dsn ($self) {
 # Test model base class
 package CountTestModel;
 use Moo;
+use experimental 'signatures';
 extends 'Durance::Model';
 
 sub _db_class_for { return 'CountTestDB'; }

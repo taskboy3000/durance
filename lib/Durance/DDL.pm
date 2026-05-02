@@ -1,9 +1,9 @@
 package Durance::DDL;
 use strict;
 use warnings;
-use experimental 'signatures';
 
 use Moo;
+use experimental 'signatures';
 
 has 'driver' => (is => 'rw', required => 1);
 

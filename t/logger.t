@@ -155,6 +155,7 @@ subtest 'Durance::Logger - Subclassable for custom behavior' => sub {
     package TestCustomLogger;
     use Moo;
     extends 'Durance::Logger';
+    use experimental 'signatures';
     
     has 'logged_messages' => (is => 'rw', default => sub { [] });
     

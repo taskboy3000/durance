@@ -2,9 +2,8 @@
 package Durance::QueryBuilder;
 use strict;
 use warnings;
-use experimental 'signatures';
-
 use Moo;
+use experimental 'signatures';
 
 has 'class' => (is => 'ro', required => 1);
 has 'driver' => (is => 'rw', default => 'SQLite');

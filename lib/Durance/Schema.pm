@@ -2,12 +2,11 @@
 package Durance::Schema;
 use strict;
 use warnings;
-use experimental 'signatures';
-
 
 use Cwd;
 use File::Find;
 use Moo;
+use experimental 'signatures';
 use Time::HiRes qw(time);
 
 has 'dbh' => (is => 'rw');
